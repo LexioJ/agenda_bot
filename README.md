@@ -65,9 +65,9 @@ The Agenda Bot is a comprehensive Nextcloud app that transforms how teams manage
 
 5. **Add the bot to Talk rooms:**
    - Go to any Talk room
-   - Click the participants list
-   - Click "Add bot"
-   - Select "Agenda bot"
+   - Open "Conversation settings"
+   - Click "Bots"
+   - Enable "Agenda bot"
 
 ## Usage
 
@@ -77,14 +77,15 @@ During or before a meeting, add agenda items using these formats:
 
 ```
 agenda: Project status review (15 min)
-topic: Budget discussion (20 min)
+topic: #3 Budget discussion (20 min)
 item: Next steps planning (10 min)
-insert: Quick updates (5 min)
+insert: #2 Quick updates (5 min)
 add: Follow-up actions
 ```
 
 **Syntax:**
 - Start with `agenda:`, `topic:`, `item:`, `insert:`, or `add:`
+- Optionally specify item position like `#3`
 - Include the topic title
 - Optionally specify duration in parentheses like `(15 min)`
 - Default duration is 10 minutes if not specified
@@ -102,18 +103,18 @@ add: Follow-up actions
 #### Item Management
 | Command | Description | Permissions | Example |
 |---------|-------------|-------------|----------|
-| `complete: X` / `done: X` / `close: X` | Mark specific item as completed | Moderators, Owners, Users | `complete: 1` |
-| `done:` (without number) | **Complete current item and auto-advance** | All participants | `done:` |
-| `incomplete: X` / `undone: X` / `reopen: X` | Reopen completed item | Moderators, Owners, Users | `reopen: 2` |
+| `complete: X` / `done: X` / `close: X` | Mark specific item as completed | Moderators, Owners | `complete: 1` |
+| `done:` (without number) | **Complete current item and auto-advance** | Moderators, Owners | `done:` |
+| `incomplete: X` / `undone: X` / `reopen: X` | Reopen completed item | Moderators, Owners | `reopen: 2` |
 | `next: X` | Set item X as current active item | Moderators, Owners | `next: 3` |
-| `remove: X` / `delete: X` | Remove agenda item X | Moderators, Owners, Users | `remove: 2` |
+| `remove: X` / `delete: X` | Remove agenda item X | Moderators, Owners | `remove: 2` |
 
 #### Reordering
 | Command | Description | Permissions | Example |
 |---------|-------------|-------------|----------|
-| `reorder: A,B,C,D` | Reorder items to new positions | Moderators, Owners, Users | `reorder: 2,1,4,3` |
-| `move: X to Y` | Move item X to position Y | Moderators, Owners, Users | `move: 3 to 1` |
-| `swap: X,Y` | Swap positions of items X and Y | Moderators, Owners, Users | `swap: 1,3` |
+| `reorder: A,B,C,D` | Reorder items to new positions | Moderators, Owners | `reorder: 2,1,4,3` |
+| `move: X to Y` | Move item X to position Y | Moderators, Owners | `move: 3 to 1` |
+| `swap: X,Y` | Swap positions of items X and Y | Moderators, Owners | `swap: 1,3` |
 
 #### Time Management (Optional)
 | Command | Description | Permissions | Example |
@@ -129,15 +130,23 @@ add: Follow-up actions
    agenda: Welcome & introductions (5 min)
    agenda: Project updates (20 min)
    agenda: Budget review (15 min)
-   agenda: Next steps (10 min)
+   agenda: Next steps
+   ```
+   "agenda list" command then shows:
+   ```
+   📋 Agenda Status
+   ⏸️ 1. Welcome & introductions (5 min)
+   ⏸️ 2. Project updates (20 min)
+   ⏸️ 3. Budget review (15 min)
+   ⏸️ 4. Next steps (10 min)
    ```
 
 2. **During the meeting:**
    ```
    agenda status          # Check current agenda (shows ➡️ for current item)
    done:                  # Complete current item & auto-advance to next
-   done:                  # Complete next item & auto-advance
-   complete: 4            # Or complete specific item by number
+   next: 3                # Skip active item and continue with specific agenda item
+   complete: 4            # Complete specific item by number
    ```
    
    **The `done:` command is especially useful because it:**
@@ -150,7 +159,23 @@ add: Follow-up actions
    - Bot automatically generates agenda summary
    - Shows completed vs remaining items with timing analysis
    - Offers optional cleanup of completed items
-
+   - Example Summary:
+     ```
+      📋 Meeting Agenda Summary
+      Topic: Agenda Bot Test
+      Total Agenda Items: 2
+      Completed: 1 (100% ✅ / 0% ⏰)
+      Remaining: 1
+      
+      ✅ Completed Items
+      Item 1 (10-9 min) 👍
+      ⏸️ Remaining Items
+      Item 2 (3 min)
+      
+      🧹 Remove completed items from agenda?
+      Moderators/Owners: Reply with 'agenda cleanup'
+      ```
+     
 ## Database Schema
 
 The Agenda Bot uses the `oc_ab_log_entries` table with these key columns:
@@ -273,12 +298,12 @@ The Agenda Bot uses the `OCA\AgendaBot` namespace and `ab_` database prefixes, e
 ## Advanced Features
 
 ### Permission System
-| Role | Add Items | Manage Items | View Status | Moderate |
+| Role | Add Items | Manage Items | Moderate | View Status |
 |------|-----------|--------------|-------------|----------|
 | **Owner** | ✅ | ✅ | ✅ | ✅ |
 | **Moderator** | ✅ | ✅ | ✅ | ✅ |
-| **User** | ✅ | ✅ | ✅ | ❌ |
-| **Guest** | ❌ | ❌ | ✅ | ❌ |
+| **User** | ✅ | ❌ | ❌ | ✅ |
+| **Guest** | ❌ | ❌ | ❌ | ✅ |
 | **Guest Moderator** | ✅ | ✅ | ✅ | ✅ |
 
 ### Time Monitoring Features
