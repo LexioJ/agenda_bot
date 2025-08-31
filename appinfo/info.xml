@@ -1,0 +1,96 @@
+<?xml version="1.0"?>
+<!--
+  - SPDX-FileCopyrightText: 2025 Agenda Bot Contributors
+  - SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+<info xmlns:xsi= "http://www.w3.org/2001/XMLSchema-instance"
+	  xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+	<id>agenda_bot</id>
+	<name>Agenda bot</name>
+	<summary><![CDATA[🤖 Transform your Talk meetings with intelligent agenda management, real-time time tracking, and automated progress monitoring!]]></summary>
+	<description><![CDATA[### 🚀 Meeting Management for Nextcloud Talk
+
+Tired of unproductive meetings that run overtime? The Agenda Bot transforms chaotic discussions into structured, efficient sessions with intelligent automation and real-time insights.
+
+### ✨ Key Features
+
+#### 🎯 Effortless Agenda Creation
+- Natural language: `agenda: Project review (15 min)` 
+- Multiple formats: `topic:`, `item:`, `add:`, `insert:`
+- Smart time parsing: `(5 min)`, `(1h)`, `(90 min)`, `(2 hours)`
+- Automatic positioning or manual `#2.` syntax
+
+#### ⏰ Intelligent Time Management
+- Background monitoring tracks time automatically
+- Smart warnings at 80%, 100%, and overtime thresholds  
+- Call-aware notifications (only during active meetings)
+- Visual progress tracking with ➡️ ✅ ⏸️ indicators
+
+#### 🔥 Seamless Meeting Flow
+- **`done:` command** - Complete current item and auto-advance!
+- Real-time status shows actual vs. planned time
+- Automatic progression through agenda items
+- Live updates for all participants
+
+#### 🔐 Smart Permission System
+- Role-based access: Owners, Moderators, Users, Guests
+- Flexible control: Who can add, manage, or view items
+- Guest moderator support for external facilitators
+
+#### 📊 Meeting Analytics & Insights
+- Completion tracking with timing statistics
+- Efficiency reports: On-time 👍 vs. overtime ⏰ 
+- Comprehensive summaries with actionable data
+- Optional cleanup of completed items
+
+### 💫 Why Using Agenda Bot?
+
+✅ **Boost Productivity** - Stay focused with structured agendas
+✅ **Save Time** - Automated tracking and progress management  
+✅ **Improve Accountability** - Clear completion tracking
+✅ **Reduce Overruns** - Smart time warnings keep meetings on track
+✅ **Easy Setup** - Works instantly in any Talk room
+
+### 🏆 Perfect For
+- Team standups and regular check-ins
+- Project planning sessions
+- Client meetings with tight schedules  
+- Board meetings requiring structure
+- Training sessions with timed modules
+
+Start having better meetings - Add the Agenda Bot to your Talk rooms and experience the difference!]]></description>
+
+	<version>1.0.0</version>
+	<licence>agpl</licence>
+
+	<author>Agenda Bot Team</author>
+
+	<namespace>AgendaBot</namespace>
+
+	<types>
+		<prevent_group_restriction />
+	</types>
+
+	<category>multimedia</category>
+	<category>social</category>
+	<category>workflow</category>
+	<category>organization</category>
+
+	<website>https://github.com/lexioj/agenda_bot</website>
+	<bugs>https://github.com/lexioj/agenda_bot/issues</bugs>
+	<repository>https://github.com/lexioj/agenda_bot.git</repository>
+
+	<dependencies>
+		<nextcloud min-version="31" max-version="32" />
+	</dependencies>
+
+	<background-jobs>
+		<job>OCA\AgendaBot\BackgroundJob\AgendaTimeMonitorJob</job>
+	</background-jobs>
+
+	<repair-steps>
+		<install>
+			<step>OCA\AgendaBot\Migration\InstallBot</step>
+		</install>
+	</repair-steps>
+</info>

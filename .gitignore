@@ -1,0 +1,35 @@
+# Dependencies
+/vendor/
+/node_modules/
+
+# Build artifacts
+/build/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Nextcloud specific
+/tests/
+/vendor-bin/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Environment files
+.env
+.env.local
+
+# Backup files
+*.bak
+*~
