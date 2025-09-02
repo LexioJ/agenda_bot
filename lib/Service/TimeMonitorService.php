@@ -166,9 +166,11 @@ class TimeMonitorService {
 				return;
 			}
 
-			// Generate warning message based on type
-			// TODO: Get language from room/user preferences
-			$message = $this->generateWarningMessage($warningType, $item, $elapsedMinutes, $plannedMinutes, 'en');
+			// Get room language or fallback to 'en'
+			$lang = $room->getLanguage() ?: 'en';
+			
+			// Generate warning message based on type with room language
+			$message = $this->generateWarningMessage($warningType, $item, $elapsedMinutes, $plannedMinutes, $lang);
 			
 			// Send message as bot using ChatManager with proper bot actor format
 			$this->chatManager->sendMessage(
@@ -207,19 +209,24 @@ class TimeMonitorService {
 		
 		switch ($warningType) {
 			case 'approaching':
-				return sprintf('⏰ **' . $l->t('Time Check') . '**: ' . $l->t('"%s" is approaching time limit (%d of %d minutes used)'), $title, $elapsedInt, $plannedMinutes);
+				return '⏰ **' . $l->t('Time Check') . '**: ' . $l->t('"%s" is approaching time limit (%d of %d minutes used)', [$title, $elapsedInt, $plannedMinutes]);
 				
 			case 'overtime':
-				return sprintf('⚠️ **' . $l->t('Time Alert') . '**: ' . $l->t('"%s" has reached planned time (%d min planned, %d min elapsed)'), $title, $plannedMinutes, $elapsedInt);
+				return '⚠️ **' . $l->t('Time Alert') . '**: ' . $l->t('"%s" has reached planned time (%d min planned, %d min elapsed)', [$title, $plannedMinutes, $elapsedInt]);
 				
 			case 'overtime_critical':
 				$overtimeMinutes = $elapsedInt - $plannedMinutes;
 				$overtimePercent = round(($config['overtime_threshold'] - 1.0) * 100);
-				return sprintf('🚨 **' . $l->t('Overtime Alert') . '**: ' . $l->t('"%s" has exceeded time limit by %d%% (%d min over, %d min planned, %d min elapsed)'), 
-					$title, $overtimePercent, $overtimeMinutes, $plannedMinutes, $elapsedInt);
+				return '🚨 **' . $l->t('Overtime Alert') . '**: ' . $l->t('"%s" has exceeded time limit by %d%% (%d min over, %d min planned, %d min elapsed)', [
+					$title, 
+					$overtimePercent, 
+					$overtimeMinutes, 
+					$plannedMinutes, 
+					$elapsedInt
+				]);
 				
 			default:
-				return sprintf('⏰ ' . $l->t('Time monitoring alert for "%s"'), $title);
+				return '⏰ ' . $l->t('Time monitoring alert for "%s"', [$title]);
 		}
 	}
 

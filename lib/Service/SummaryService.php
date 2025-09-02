@@ -17,6 +17,8 @@ use OCP\L10N\IFactory;
 
 class SummaryService {
 
+	private $l;
+
 	public function __construct(
 		protected LogEntryMapper $logEntryMapper,
 		protected ITimeFactory $timeFactory,
@@ -24,6 +26,7 @@ class SummaryService {
 		protected AgendaService $agendaService,
 		protected IFactory $l10nFactory,
 	) {
+		$this->l = $l10nFactory->get('agenda_bot');
 	}
 
 	public function processMessage(string $message, array $data): bool {
@@ -66,11 +69,11 @@ class SummaryService {
 		// Enhanced completed section with timing percentages
 		if ($agendaData['completed'] > 0) {
 			$timingStats = $agendaData['timing_stats'];
-			$summary .= sprintf("**" . $l->t('Completed:') . "** %d (%d%% 👍 / %d%% ⏰)\n", 
+			$summary .= "**" . $l->t('Completed:') . "** " . $l->t('%d (%d%% 👍 / %d%% ⏰)', [
 				$agendaData['completed'],
 				$timingStats['in_time_percentage'],
 				$timingStats['overdue_percentage']
-			);
+			]) . "\n";
 		} else {
 			$summary .= "**" . $l->t('Completed:') . "** " . $agendaData['completed'] . "\n";
 		}
@@ -86,13 +89,13 @@ class SummaryService {
 				
 				// Format timing display: planned+diff or planned-diff
 				if ($timeDiff > 0) {
-					$timingDisplay = sprintf("(%d+%d " . $l->t('min') . ")", $plannedDuration, $timeDiff);
-					$statusIcon = " ⏰";
+					$timingDisplay = $l->t('(%d+%d min)', [$plannedDuration, $timeDiff]);
+					$statusIcon = " " . $this->l->t('Time Warning');
 				} elseif ($timeDiff < 0) {
-					$timingDisplay = sprintf("(%d%d " . $l->t('min') . ")", $plannedDuration, $timeDiff); // negative diff
+					$timingDisplay = $l->t('(%d%d min)', [$plannedDuration, $timeDiff]); // negative diff
 					$statusIcon = " 👍";
 				} else {
-					$timingDisplay = sprintf("(%d " . $l->t('min') . ")", $plannedDuration);
+					$timingDisplay = $l->t('(%d min)', [$plannedDuration]);
 					$statusIcon = " 👍";
 				}
 				

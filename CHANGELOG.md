@@ -5,6 +5,15 @@ All notable changes to the Agenda Bot project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - 2025-09-02
+
+### Fixed
+- **Translation System**: Fixed string formatting in all core services
+  - Switched from sprintf() to proper l10n array parameters
+  - Fixed guest name localization in BotInvokeListener
+  - Improved language detection from room settings
+  - Added proper language parameter passing through service calls
+
 ## [1.1.1] - 2025-01-XX
 
 ### Fixed
