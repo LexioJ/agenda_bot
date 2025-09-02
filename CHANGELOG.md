@@ -5,6 +5,20 @@ All notable changes to the Agenda Bot project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2025-01-XX
+
+### Fixed
+- **Bot Permission Handling**: Fixed permission check failures when bot actors access help commands
+  - Bot actors (type: "Application" with "bots/" prefix) now have full permissions by default
+  - Resolves "Missing talkParticipantType in actor data" errors in logs
+  - Fixes bot registration display showing "__language_name__" placeholder
+  - English bot now displays as "Agenda bot (English)", German as "Agenda bot (Deutsch)"
+
+### Technical
+- Updated `PermissionService` methods to handle bot actors properly
+- Added explicit language name mapping in `BotService`
+- Improved error handling and logging for permission checks
+
 ## [1.1.0] - 2025-01-XX
 
 ### 🌍 Added - Multi-Language Support

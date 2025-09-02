@@ -66,6 +66,12 @@ class PermissionService {
 	public function isActorModerator(string $token, array $actorData): bool {
 		// Extract user ID from actor data
 		$actorId = $actorData['id'] ?? '';
+		$actorType = $actorData['type'] ?? null;
+		
+		// Handle bot actors - bots have full permissions (considered as moderators)
+		if ($actorType === 'Application' && isset($actorData['id']) && str_contains($actorData['id'], 'bots/')) {
+			return true;
+		}
 		
 		// Note: We don't skip guests here since type 6 (Guest with moderator permissions) should be allowed
 		// The talkParticipantType will determine actual permissions
@@ -114,10 +120,19 @@ class PermissionService {
 	 */
 	public function canAddAgendaItems(string $token, array $actorData): bool {
 		$actorId = $actorData['id'] ?? null;
+		$actorType = $actorData['type'] ?? null;
 		$participantType = $actorData['talkParticipantType'] ?? null;
 
+		// Handle bot actors - bots have full permissions
+		if ($actorType === 'Application' && isset($actorData['id']) && str_contains($actorData['id'], 'bots/')) {
+			return true;
+		}
+
 		if ($participantType === null) {
-			$this->logger->error('Missing talkParticipantType in actor data for canAddAgendaItems', ['actorData' => $actorData]);
+			$this->logger->error('Missing talkParticipantType in actor data for canAddAgendaItems', [
+				'actorData' => $actorData,
+				'token' => $token
+			]);
 			throw new \Exception('Missing talkParticipantType in actor data');
 		}
 
@@ -144,7 +159,13 @@ class PermissionService {
 	 * @throws \Exception If the permission check fails
 	 */
 	public function canViewAgenda(string $token, array $actorData): bool {
+		$actorType = $actorData['type'] ?? null;
 		$participantType = $actorData['talkParticipantType'] ?? null;
+
+		// Handle bot actors - bots have full permissions
+		if ($actorType === 'Application' && isset($actorData['id']) && str_contains($actorData['id'], 'bots/')) {
+			return true;
+		}
 
 		if ($participantType === null) {
 			throw new \Exception('Missing talkParticipantType in actor data');
