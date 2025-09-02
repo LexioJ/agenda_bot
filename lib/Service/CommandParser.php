@@ -202,28 +202,28 @@ class CommandParser {
 	 * Get command help text
 	 */
 	public function getCommandHelp(): string {
-		return "### 📋 **Agenda Commands:**\n\n" .
-			   "**Adding Items:**\n" .
-			   "• `agenda: Topic name (15 min)` - Add agenda item with time\n" .
-			   "• `topic: Meeting topic (1h)` - Alternative syntax\n" .
-			   "• `item: General discussion` - Add item (10 min default)\n" .
-			   "• `insert: New topic (30 min)` - Insert agenda item\n" .
-			   "• `add: Another topic (2 hours)` - Add agenda item\n" .
-			   "\n**Time Formats:** `(5 m)`, `(10 min)`, `(1h)`, `(2 hours)`, `(90 min)`\n\n" .
-			   "**Status & Management:**\n" .
-			   "• `agenda status` - Show current agenda status\n" .
-			   "• `agenda list` - Show agenda items\n" .
-			   "• `agenda clear` - Clear all agenda items\n" .
-			   "• `next: 2` - Set agenda item 2 as current\n\n" .
-			   "**Complete/Reopen Items:**\n" .
-			   "• `complete: 1` / `done: 1` / `close: 1` - Mark item as completed\n" .
-			   "• `incomplete: 1` / `undone: 1` / `reopen: 1` - Reopen completed item\n\n" .
-			   "**Reorder & Management:**\n" .
-			   "• `reorder: 2,1,4,3` - Reorder agenda items\n" .
-			   "• `move: 3 to 1` - Move item 3 to position 1\n" .
-			   "• `swap: 1,3` - Swap agenda items 1 and 3\n" .
-			   "• `remove: 2` / `delete: 2` - Remove agenda item 2\n\n" .
-			   "**Get Help:**\n" .
-			   "• `agenda help` - Show this help message";
+		return "### 📋 **" . $this->l->t('Agenda Commands:') . "**\n\n" .
+			   "**" . $this->l->t('Adding Items:') . "**\n" .
+			   "• `" . $this->l->t('Add item with time example') . "` - " . $this->l->t('Add agenda item with time') . "\n" .
+			   "• `" . $this->l->t('Alternative syntax example') . "` - " . $this->l->t('Alternative syntax') . "\n" .
+			   "• `" . $this->l->t('Add default item example') . "` - " . $this->l->t('Add item (10 min default)') . "\n" .
+			   "• `" . $this->l->t('Insert item example') . "` - " . $this->l->t('Add agenda item with time') . "\n" .
+			   "• `" . $this->l->t('Add another item example') . "` - " . $this->l->t('Add agenda item with time') . "\n" .
+			   "\n**" . $this->l->t('Time Formats:') . "** `" . $this->l->t('Time Format Examples') . "`\n\n" .
+			   "**" . $this->l->t('Status & Management:') . "**\n" .
+			   "• `agenda status` - " . $this->l->t('Show current agenda status') . "\n" .
+			   "• `agenda list` - " . $this->l->t('Show agenda items') . "\n" .
+			   "• `agenda clear` - " . $this->l->t('Clear all agenda items') . "\n" .
+			   "• `" . $this->l->t('Set current example') . "` - " . $this->l->t('Set agenda item %d as current', [2]) . "\n\n" .
+			   "**" . $this->l->t('Complete/Reopen Items:') . "**\n" .
+			   "• `" . $this->l->t('Complete item example') . "` - " . $this->l->t('Mark item as completed') . "\n" .
+			   "• `" . $this->l->t('Reopen item example') . "` - " . $this->l->t('Reopen completed item') . "\n\n" .
+			   "**" . $this->l->t('Reorder & Management:') . "**\n" .
+			   "• `" . $this->l->t('Reorder example') . "` - " . $this->l->t('Reorder agenda items') . "\n" .
+			   "• `" . $this->l->t('Move example') . "` - " . $this->l->t('Move item %d to position %d', [3, 1]) . "\n" .
+			   "• `" . $this->l->t('Swap example') . "` - " . $this->l->t('Swap agenda items %d and %d', [1, 3]) . "\n" .
+			   "• `" . $this->l->t('Remove example') . "` - " . $this->l->t('Remove agenda item %d', [2]) . "\n\n" .
+			   "**" . $this->l->t('Get Help:') . "**\n" .
+			   "• `" . $this->l->t('Help example') . "` - " . $this->l->t('Show this help message') . ";";
 	}
 }
