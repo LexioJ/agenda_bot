@@ -12,5 +12,6 @@ namespace OCA\AgendaBot\Model;
 class Bot {
 	public const SUPPORTED_LANGUAGES = [
 		'en',
+		'de',
 	];
 }

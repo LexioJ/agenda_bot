@@ -9,11 +9,13 @@ declare(strict_types=1);
 
 namespace OCA\AgendaBot\Service;
 
+use OCA\AgendaBot\AppInfo\Application;
 use OCA\AgendaBot\Model\LogEntry;
 use OCA\AgendaBot\Model\LogEntryMapper;
 use OCA\Talk\Manager;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\IConfig;
+use OCP\L10N\IFactory;
 use Psr\Log\LoggerInterface;
 
 class AgendaService {
@@ -26,6 +28,7 @@ class AgendaService {
 		private IConfig $config,
 		private PermissionService $permissionService,
 		private LoggerInterface $logger,
+		private IFactory $l10nFactory,
 	) {
 	}
 
@@ -81,30 +84,32 @@ class AgendaService {
 	 * Format duration in minutes to a human-readable string
 	 * Returns "x h y min" for durations >= 60 minutes, "x min" otherwise
 	 */
-	private function formatDurationDisplay(int $minutes): string {
+	private function formatDurationDisplay(int $minutes, string $lang = 'en'): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
 		if ($minutes < 60) {
-			return $minutes . ' min';
+			return $minutes . ' ' . $l->t('min');
 		}
 		
 		$hours = intval($minutes / 60);
 		$remainingMinutes = $minutes % 60;
 		
 		if ($remainingMinutes === 0) {
-			return $hours . ' h';
+			return $hours . ' ' . $l->t('h');
 		}
 		
-		return $hours . ' h ' . $remainingMinutes . ' min';
+		return $hours . ' ' . $l->t('h %d min', [$remainingMinutes]);
 	}
 
 	/**
 	 * Add agenda item (requires add permissions: types 1,2,3,6)
 	 */
-	public function addAgendaItem(string $token, array $agendaData, ?array $actorData = null): array {
+	public function addAgendaItem(string $token, array $agendaData, ?array $actorData = null, string $lang = 'en'): array {
 		// Check add permissions if actor data is provided
 		if ($actorData !== null && !$this->permissionService->canAddAgendaItems($token, $actorData)) {
 			return [
 				'success' => false,
-				'message' => $this->permissionService->getAddAgendaDeniedMessage()
+				'message' => $this->permissionService->getAddAgendaDeniedMessage($lang)
 			];
 		}
 		
@@ -130,9 +135,11 @@ class AgendaService {
 
 		$this->logEntryMapper->insert($logEntry);
 
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
 		return [
 			'success' => true,
-			'message' => sprintf('📋 Added agenda item %d: %s (%s)', $position, $title, $this->formatDurationDisplay($duration)),
+			'message' => sprintf('📋 ' . $l->t('Added agenda item %d: %s (%s)'), $position, $title, $this->formatDurationDisplay($duration, $lang)),
 		];
 	}
 
@@ -160,7 +167,7 @@ class AgendaService {
 	/**
 	 * Get agenda status
 	 */
-	public function getAgendaStatus(string $token): string {
+	public function getAgendaStatus(string $token, string $lang = 'en'): string {
 		$items = $this->getAgendaItems($token);
 		$currentItem = $this->getCurrentAgendaItem($token);
 
@@ -208,19 +215,21 @@ class AgendaService {
 	/**
 	 * Set the current agenda item (requires moderator permissions)
 	 */
-	public function setCurrentAgendaItem(string $token, int $position, ?array $actorData = null): ?string {
+	public function setCurrentAgendaItem(string $token, int $position, ?array $actorData = null, string $lang = 'en'): ?string {
 		// Check moderator permissions if actor data is provided
 		if ($actorData !== null && !$this->permissionService->isActorModerator($token, $actorData)) {
-			return $this->permissionService->getPermissionDeniedMessage('set the current agenda item');
+			$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+			return $this->permissionService->getPermissionDeniedMessage($l->t('set the current agenda item'), $lang);
 		}
 		
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
 		$item = $this->logEntryMapper->findAgendaItemByPosition($token, $position);
 		if (!$item) {
-			return sprintf('❌ Agenda item %d not found', $position);
+			return sprintf('❌ ' . $l->t('Agenda item %d not found'), $position);
 		}
 
 		if ($item->getIsCompleted()) {
-			return sprintf('ℹ️ Cannot set completed item %d as current: "%s"', $position, $item->getDetails());
+			return sprintf('ℹ️ ' . $l->t('Cannot set completed item %d as current: "%s"'), $position, $item->getDetails());
 		}
 
 		// Clear current status from other items
@@ -230,7 +239,7 @@ class AgendaService {
 		$item->setStartTime($this->timeFactory->now()->getTimestamp());
 		$this->logEntryMapper->update($item);
 
-		return sprintf('➡️ Set agenda item %d as current: "%s"', $position, $item->getDetails());
+		return sprintf('➡️ ' . $l->t('Set agenda item %d as current: "%s"'), $position, $item->getDetails());
 	}
 
 	/**
@@ -325,19 +334,21 @@ class AgendaService {
 	/**
 	 * Mark agenda item as completed (requires moderator permissions)
 	 */
-	public function completeAgendaItem(string $token, int $position, ?array $actorData = null): ?string {
+	public function completeAgendaItem(string $token, int $position, ?array $actorData = null, string $lang = 'en'): ?string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
 		// Check moderator permissions if actor data is provided
 		if ($actorData !== null && !$this->permissionService->isActorModerator($token, $actorData)) {
-			return $this->permissionService->getPermissionDeniedMessage('complete agenda items');
+			return $this->permissionService->getPermissionDeniedMessage($l->t('complete agenda items'), $lang);
 		}
 		
 		$item = $this->logEntryMapper->findAgendaItemByPosition($token, $position);
 		if (!$item) {
-			return sprintf('❌ Agenda item %d not found', $position);
+			return sprintf('❌ ' . $l->t('Agenda item %d not found'), $position);
 		}
 
 		if ($item->getIsCompleted()) {
-			return sprintf('ℹ️ Agenda item %d is already completed: "%s"', $position, $item->getDetails());
+			return sprintf('ℹ️ ' . $l->t('Agenda item %d is already completed: "%s"'), $position, $item->getDetails());
 		}
 
 		$item->setIsCompleted(true);
@@ -345,13 +356,13 @@ class AgendaService {
 		// Keep startTime for duration calculation, just mark as completed
 		$this->logEntryMapper->update($item);
 
-		$response = sprintf('✅ Marked agenda item %d as completed: "%s"', $position, $item->getDetails());
+		$response = sprintf('✅ ' . $l->t('Marked agenda item %d as completed: "%s"'), $position, $item->getDetails());
 
 		// Auto-move to next incomplete item only if call is active
 		if ($this->isCallActive($token)) {
 			$nextItem = $this->moveToNextIncompleteItem($token);
 			if ($nextItem) {
-				$response .= "\n➡️ Moving to next item: \"{$nextItem->getDetails()}\"";
+				$response .= "\n➡️ " . $l->t('Moving to next item: "%s"', $nextItem->getDetails());
 			}
 		}
 
@@ -361,22 +372,23 @@ class AgendaService {
 	/**
 	 * Complete the current agenda item and move to next
 	 */
-	public function completeCurrentAgendaItem(string $token): ?string {
+	public function completeCurrentAgendaItem(string $token, string $lang = 'en'): ?string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
 		$currentItem = $this->getCurrentAgendaItem($token);
 		
 		if (!$currentItem) {
-			return '❌ No current agenda item is active';
+			return '❌ ' . $l->t('No current agenda item is active');
 		}
 
 		if ($currentItem->getIsCompleted()) {
-			return sprintf('ℹ️ Current agenda item %d is already completed: "%s"', $currentItem->getOrderPosition(), $currentItem->getDetails());
+			return sprintf('ℹ️ ' . $l->t('Current agenda item %d is already completed: "%s"'), $currentItem->getOrderPosition(), $currentItem->getDetails());
 		}
 
 		// Calculate actual time spent before marking as completed
 		$actualTime = $this->getTimeSpentOnItem($currentItem);
 		$plannedTime = $currentItem->getDurationMinutes();
-		$actualDisplay = $this->formatDurationDisplay($actualTime);
-		$plannedDisplay = $this->formatDurationDisplay($plannedTime);
+		$actualDisplay = $this->formatDurationDisplay($actualTime, $lang);
+		$plannedDisplay = $this->formatDurationDisplay($plannedTime, $lang);
 
 		// Mark as completed
 		$currentItem->setIsCompleted(true);
@@ -384,7 +396,7 @@ class AgendaService {
 		// Keep startTime for duration calculation, just mark as completed
 		$this->logEntryMapper->update($currentItem);
 
-		$response = sprintf('✅ Completed current agenda item %d: **"%s"** (%s/%s)', 
+		$response = sprintf('✅ ' . $l->t('Completed current agenda item %d: **"%s"** (%s/%s)'), 
 			$currentItem->getOrderPosition(), 
 			$currentItem->getDetails(), 
 			$actualDisplay, 
@@ -410,35 +422,39 @@ class AgendaService {
 	/**
 	 * Reopen/mark agenda item as incomplete (requires moderator permissions)
 	 */
-	public function reopenAgendaItem(string $token, int $position, ?array $actorData = null): ?string {
+	public function reopenAgendaItem(string $token, int $position, ?array $actorData = null, string $lang = 'en'): ?string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
 		// Check moderator permissions if actor data is provided
 		if ($actorData !== null && !$this->permissionService->isActorModerator($token, $actorData)) {
-			return $this->permissionService->getPermissionDeniedMessage('reopen agenda items');
+			return $this->permissionService->getPermissionDeniedMessage($l->t('reopen agenda items'), $lang);
 		}
 		
 		$item = $this->logEntryMapper->findAgendaItemByPosition($token, $position);
 		if (!$item) {
-			return sprintf('❌ Agenda item %d not found', $position);
+			return sprintf('❌ ' . $l->t('Agenda item %d not found'), $position);
 		}
 
 		if (!$item->getIsCompleted()) {
-			return sprintf('ℹ️ Agenda item %d is already open/incomplete: "%s"', $position, $item->getDetails());
+			return sprintf('ℹ️ ' . $l->t('Agenda item %d is already open/incomplete: "%s"'), $position, $item->getDetails());
 		}
 
 		$item->setIsCompleted(false);
 		$item->setCompletedAt(null);
 		$this->logEntryMapper->update($item);
 
-		return sprintf('🔄 Reopened agenda item %d: "%s"', $position, $item->getDetails());
+		return sprintf('🔄 ' . $l->t('Reopened agenda item %d: "%s"'), $position, $item->getDetails());
 	}
 
 	/**
 	 * Clear all agenda items for a conversation (requires moderator permissions)
 	 */
-	public function clearAgenda(string $token, ?array $actorData = null): string {
+	public function clearAgenda(string $token, ?array $actorData = null, string $lang = 'en'): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
 		// Check moderator permissions if actor data is provided
 		if ($actorData !== null && !$this->permissionService->isActorModerator($token, $actorData)) {
-			return $this->permissionService->getPermissionDeniedMessage('clear the agenda');
+			return $this->permissionService->getPermissionDeniedMessage($l->t('clear the agenda'), $lang);
 		}
 		
 		$items = $this->logEntryMapper->findAgendaItems($token);
@@ -448,7 +464,7 @@ class AgendaService {
 			$this->logEntryMapper->delete($item);
 		}
 
-		return sprintf('🗑️ Cleared %d agenda items', $count);
+		return sprintf('🗑️ ' . $l->t('Cleared %d agenda items'), $count);
 	}
 
 	/**
@@ -547,7 +563,7 @@ class AgendaService {
 	/**
 	 * Get agenda help based on user role
 	 */
-	public function getAgendaHelp(string $token = '', ?array $actorData = null): string {
+	public function getAgendaHelp(string $token = '', ?array $actorData = null, string $lang = 'en'): string {
 		$isModerator = false;
 		$canAddItems = false;
 		$participantType = null;
@@ -570,12 +586,14 @@ class AgendaService {
 			}
 		}
 		
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
 		// Base help content available to all users
-		$help = "### 📋 **Agenda Commands:**\n\n" .
-				"**Status & Viewing:**\n" .
-				"• `agenda status` - Show current agenda status\n" .
-				"• `agenda list` - Show agenda items\n" .
-				"• `agenda help` - Show this help message\n\n";
+		$help = "### 📋 **" . $l->t('Agenda Commands:') . "**\n\n" .
+				"**" . $l->t('Status & Viewing:') . "**\n" .
+				"• `agenda status` - " . $l->t('Show current agenda status') . "\n" .
+				"• `agenda list` - " . $l->t('Show agenda items') . "\n" .
+				"• `agenda help` - " . $l->t('Show this help message') . "\n\n";
 		
 		// Add item commands for users who can add (types 1,2,3,6)
 		if ($canAddItems) {
@@ -804,10 +822,12 @@ class AgendaService {
 	/**
 	 * Remove all completed agenda items and reorder remaining items (requires moderator permissions)
 	 */
-	public function removeCompletedItems(string $token, ?array $actorData = null): ?string {
+	public function removeCompletedItems(string $token, ?array $actorData = null, string $lang = 'en'): ?string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
 		// Check moderator permissions if actor data is provided
 		if ($actorData !== null && !$this->permissionService->isActorModerator($token, $actorData)) {
-			return $this->permissionService->getPermissionDeniedMessage('remove completed agenda items');
+			return $this->permissionService->getPermissionDeniedMessage($l->t('remove completed agenda items'), $lang);
 		}
 		
 		$allItems = $this->logEntryMapper->findAgendaItems($token);
@@ -815,7 +835,7 @@ class AgendaService {
 		$incompleteItems = array_filter($allItems, fn($item) => !$item->getIsCompleted());
 		
 		if (empty($completedItems)) {
-			return '✅ No completed items to remove';
+			return '✅ ' . $l->t('No completed items to remove');
 		}
 		
 		$completedCount = count($completedItems);
@@ -842,9 +862,9 @@ class AgendaService {
 				$this->logEntryMapper->updateAgendaPositions($token, $updates);
 			}
 			
-			return sprintf('🧹 Removed %d completed items and reordered %d remaining items', $completedCount, count($incompleteItems));
+			return sprintf('🧹 ' . $l->t('Removed %d completed items and reordered %d remaining items'), $completedCount, count($incompleteItems));
 		} else {
-			return sprintf('🧹 Removed %d completed items - agenda is now empty', $completedCount);
+			return sprintf('🧹 ' . $l->t('Removed %d completed items - agenda is now empty'), $completedCount);
 		}
 	}
 

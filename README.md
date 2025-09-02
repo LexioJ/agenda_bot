@@ -2,6 +2,8 @@
 
 🤖 **A specialized bot for intelligent meeting agenda management and real-time time tracking during Nextcloud Talk calls.**
 
+🌍 **Now with multi-language support!** Available in English and German, with more languages coming soon.
+
 ## Overview
 
 The Agenda Bot is a comprehensive Nextcloud app that transforms how teams manage meeting agendas. Beyond basic agenda management, it provides intelligent time monitoring, permission-based access control, and automated progress tracking to ensure productive and efficient meetings.
@@ -33,6 +35,13 @@ The Agenda Bot is a comprehensive Nextcloud app that transforms how teams manage
 - **Automatic agenda detection** - Parses agenda items from natural chat messages  
 - **Comprehensive summaries** - Detailed meeting summaries with timing analytics
 - **Cleanup automation** - Optional cleanup of completed items post-meeting
+
+### 🌍 **Multi-Language Support**
+- **Separate language bots** - Choose your preferred language when adding the bot
+- **Complete localization** - All messages, commands, and responses in your language
+- **Currently supported**: English (en), German (de)
+- **Automatic language detection** - Bot responds in the appropriate language
+- **Nextcloud l10n standards** - Following official internationalization guidelines
 
 ## Installation
 
@@ -67,7 +76,8 @@ The Agenda Bot is a comprehensive Nextcloud app that transforms how teams manage
    - Go to any Talk room
    - Open "Conversation settings"
    - Click "Bots"
-   - Enable "Agenda bot"
+   - Choose your preferred language: "Agenda bot (English)" or "Agenda bot (Deutsch)"
+   - Enable the selected bot
 
 ## Usage
 
@@ -217,46 +227,54 @@ agenda_bot/
 │   ├── AppInfo/
 │   │   └── Application.php       # Main app bootstrap
 │   ├── Model/
-│   │   ├── Bot.php              # Bot entity model
+│   │   ├── Bot.php              # Bot entity model with supported languages
 │   │   ├── LogEntry.php         # Database entity with agenda fields
 │   │   └── LogEntryMapper.php   # Database operations & queries
 │   ├── Service/
-│   │   ├── AgendaService.php    # Core agenda logic & item management
-│   │   ├── BotService.php       # Bot registration & management
+│   │   ├── AgendaService.php    # Core agenda logic & item management (l10n)
+│   │   ├── BotService.php       # Multi-language bot registration & management
 │   │   ├── CommandParser.php    # Message parsing & command detection
-│   │   ├── PermissionService.php # Access control & user permissions
-│   │   ├── TimeMonitorService.php # Time tracking & warning system
-│   │   └── SummaryService.php   # Meeting summaries & analytics
+│   │   ├── PermissionService.php # Access control & user permissions (l10n)
+│   │   ├── TimeMonitorService.php # Time tracking & warning system (l10n)
+│   │   └── SummaryService.php   # Meeting summaries & analytics (l10n)
 │   ├── BackgroundJob/
 │   │   └── AgendaTimeMonitorJob.php # Background time monitoring
 │   ├── Listener/
-│   │   └── BotInvokeListener.php # Talk event handling
+│   │   └── BotInvokeListener.php # Talk event handling with language detection
 │   └── Migration/
 │       ├── InstallBot.php       # Bot installation repair step
 │       └── Version1000Date...php # Database schema migration
+├── l10n/                         # 🌍 Translation files
+│   ├── en.json                  # English translations (74+ strings)
+│   └── de.json                  # German translations (45+ strings)
+├── docs/                         # Documentation & screenshots
+├── CHANGELOG.md                  # Version history & release notes
+├── MULTILINGUAL_SUPPORT.md       # 🌍 Internationalization documentation
 ├── LICENSE                       # AGPL-3.0-or-later
 └── README.md                     # This file
 ```
 
 ### Key Components
 
-1. **AgendaService** - Core agenda functionality, item lifecycle management
-2. **TimeMonitorService** - Intelligent time tracking and warning system
-3. **PermissionService** - Role-based access control and security
+1. **AgendaService** - Core agenda functionality, item lifecycle management (🌍 l10n)
+2. **TimeMonitorService** - Intelligent time tracking and warning system (🌍 l10n)
+3. **PermissionService** - Role-based access control and security (🌍 l10n)
 4. **CommandParser** - Advanced message parsing with 15+ command patterns
-5. **BotInvokeListener** - Talk event handling and bot responses
+5. **BotInvokeListener** - Talk event handling and bot responses (🌍 language detection)
 6. **AgendaTimeMonitorJob** - Background monitoring service
 7. **LogEntryMapper** - Optimized database operations with indexed queries
-8. **SummaryService** - Meeting analytics and comprehensive summaries
+8. **SummaryService** - Meeting analytics and comprehensive summaries (🌍 l10n)
+9. **BotService** - Multi-language bot registration and management (🌍 l10n)
 
 ### Development Guidelines
 
 #### Adding New Features
 1. **New Commands:** Add regex patterns to `CommandParser::parseCommand()`
-2. **Agenda Operations:** Extend `AgendaService` with new methods
-3. **Permission Control:** Update `PermissionService` for new access rules
-4. **Time Features:** Enhance `TimeMonitorService` for monitoring capabilities
+2. **Agenda Operations:** Extend `AgendaService` with new methods (🌍 add l10n support)
+3. **Permission Control:** Update `PermissionService` for new access rules (🌍 add l10n support)
+4. **Time Features:** Enhance `TimeMonitorService` for monitoring capabilities (🌍 add l10n support)
 5. **Database Changes:** Create migration files in `lib/Migration/`
+6. **🌍 New Languages:** Add translation files in `l10n/{lang}.json` and update `Bot::SUPPORTED_LANGUAGES`
 
 #### Architecture Principles
 - **Service-oriented** - Each service has a single responsibility
@@ -264,6 +282,7 @@ agenda_bot/
 - **Event-driven** - Responds to Talk events for seamless integration
 - **Background processing** - Time monitoring runs independently
 - **Database optimization** - Indexed queries for performance
+- **🌍 Internationalization-ready** - All user-facing text supports localization
 
 ### Testing
 
@@ -281,8 +300,9 @@ Since this is a pure Nextcloud app without external dependencies, testing is don
 The Agenda Bot integrates with Nextcloud Talk through:
 
 1. **Event Listeners** - Responds to Talk events (messages, call start/end)
-2. **Bot Registration** - Registers itself as a Talk bot during installation
-3. **Webhook Handling** - Processes incoming messages and activities
+2. **🌍 Multi-Language Bot Registration** - Registers separate bot instances for each supported language
+3. **Webhook Handling** - Processes incoming messages and activities with language detection
+4. **Language Detection** - Automatically detects user language from bot events
 
 ### Database Design
 
@@ -319,6 +339,30 @@ The Agenda Bot uses the `OCA\AgendaBot` namespace and `ab_` database prefixes, e
 - **Progress indicators** - Visual status with ✅ ⏸️ ➡️ emojis
 - **Timing insights** - On-time (👍) vs. overtime (⏰) completion tracking
 - **Summary exports** - Detailed meeting reports with statistics
+
+## 🌍 Multi-Language Features
+
+### Language Support
+- **English (en)** - Complete with 74+ translated strings
+- **German (de)** - Complete with 45+ translated strings
+- **Framework ready** for additional languages
+
+### Bot Registration
+- **Separate bot instances** per language (e.g., "Agenda bot (English)", "Agenda bot (Deutsch)")
+- **Localized descriptions** in bot selection interface
+- **Language-specific URLs** for proper routing
+
+### User Experience
+- **Automatic language detection** from user's Nextcloud settings
+- **Consistent localization** across all bot responses
+- **Fallback to English** for missing translations
+- **Help commands** display in user's preferred language
+
+### Developer Features
+- **Nextcloud l10n standards** - Uses official `IFactory` and `$l->t()` patterns
+- **Easy language addition** - Add JSON file and update `Bot::SUPPORTED_LANGUAGES`
+- **Translation validation** - Structured JSON format with pluralization rules
+- **Comprehensive documentation** - See `MULTILINGUAL_SUPPORT.md` for implementation details
 
 ## Contributing
 

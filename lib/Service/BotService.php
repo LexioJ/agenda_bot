@@ -15,6 +15,7 @@ use OCA\Talk\Events\BotUninstallEvent;
 use OCP\EventDispatcher\IEventDispatcher;
 use OCP\IConfig;
 use OCP\IURLGenerator;
+use OCP\L10N\IFactory;
 use OCP\Security\ISecureRandom;
 
 class BotService {
@@ -23,6 +24,7 @@ class BotService {
 		protected IURLGenerator $url,
 		protected IEventDispatcher $dispatcher,
 		protected ISecureRandom $random,
+		protected IFactory $l10nFactory,
 	) {
 	}
 
@@ -48,11 +50,17 @@ class BotService {
 	}
 
 	protected function installLanguage(string $secret, string $lang): void {
+		$libL10n = $this->l10nFactory->get('lib', $lang);
+		$langName = $libL10n->t('__language_name__');
+		
+		// Get localized strings
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
 		$event = new BotInstallEvent(
-			'Agenda bot',
+			$l->t('Agenda bot'),
 			$secret . str_replace('_', '', $lang),
 			'nextcloudapp://' . Application::APP_ID . '/' . $lang,
-			'Agenda Bot - Specialized bot for managing meeting agendas and tracking agenda items during Talk calls',
+			$l->t('Agenda bot') . ' (' . $langName . ') - ' . $l->t('Specialized bot for managing meeting agendas and tracking agenda items during Talk calls'),
 			features: 4, // EVENT
 		);
 		try {

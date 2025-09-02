@@ -1,0 +1,65 @@
+feat: Add comprehensive multi-language support (v1.1.0)
+
+🌍 MAJOR FEATURE: Complete internationalization implementation following Nextcloud l10n standards
+
+## Core Changes
+
+### Multi-Language Bot Registration
+- Separate bot instances for each language (English, German)
+- Localized bot names and descriptions in Talk interface
+- Language-specific URLs and unique identifiers per bot
+- Updated Bot::SUPPORTED_LANGUAGES to match available translations
+
+### Service Layer Internationalization
+- **AgendaService**: All user-facing messages localized (74+ strings)
+  - Agenda status, item management, help content, time formatting
+  - Error messages, action confirmations, welcome messages
+- **PermissionService**: Permission denied messages localized
+- **SummaryService**: Meeting summaries and reports localized
+- **TimeMonitorService**: Time monitoring alerts and warnings localized
+- **BotInvokeListener**: Language detection and parameter passing
+
+### Translation Infrastructure
+- Complete English (en.json) - 74+ translated strings
+- Complete German (de.json) - 45+ translated strings
+- Proper JSON structure with pluralization rules
+- Nextcloud l10n factory integration across all services
+
+### Technical Implementation
+- Dependency injection of IFactory $l10nFactory in all services
+- Language parameter passing through entire service call chain
+- Automatic language detection from bot events
+- Graceful fallback to English for missing translations
+- Backward compatibility maintained
+
+## New Files
+- l10n/en.json - English translations
+- l10n/de.json - German translations  
+- CHANGELOG.md - Version history and release notes
+- MULTILINGUAL_SUPPORT.md - Comprehensive i18n documentation
+
+## Updated Files
+- README.md - Multi-language features, updated project structure
+- All Service classes - l10n support added
+- BotInvokeListener.php - Language detection and passing
+- Bot.php - Supported languages configuration
+- .gitignore - Translation file patterns
+
+## User Experience Improvements
+- Users can choose preferred language bot during installation
+- All bot responses appear in user's selected language
+- Help commands display localized content
+- Meeting summaries generated in appropriate language
+- Error messages and confirmations translated
+
+## Developer Experience
+- Consistent l10n patterns across codebase
+- Easy framework for adding new languages
+- Comprehensive documentation and examples
+- Translation validation and testing tools
+
+This release establishes Agenda Bot as a truly international application,
+following the same multi-language architecture as Nextcloud's Call Summary Bot.
+
+Closes: Multi-language support feature request
+Version: 1.1.0

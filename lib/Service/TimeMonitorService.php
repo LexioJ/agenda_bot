@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OCA\AgendaBot\Service;
 
 use DateTime;
+use OCA\AgendaBot\AppInfo\Application;
 use OCA\AgendaBot\Model\LogEntry;
 use OCA\AgendaBot\Model\LogEntryMapper;
 use OCA\Talk\Chat\ChatManager;
@@ -17,6 +18,7 @@ use OCA\Talk\Manager;
 use OCA\Talk\Model\Attendee;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\IConfig;
+use OCP\L10N\IFactory;
 use Psr\Log\LoggerInterface;
 
 class TimeMonitorService {
@@ -33,6 +35,7 @@ class TimeMonitorService {
 		private LoggerInterface $logger,
 		private ChatManager $chatManager,
 		private Manager $talkManager,
+		private IFactory $l10nFactory,
 	) {
 	}
 
@@ -164,7 +167,8 @@ class TimeMonitorService {
 			}
 
 			// Generate warning message based on type
-			$message = $this->generateWarningMessage($warningType, $item, $elapsedMinutes, $plannedMinutes);
+			// TODO: Get language from room/user preferences
+			$message = $this->generateWarningMessage($warningType, $item, $elapsedMinutes, $plannedMinutes, 'en');
 			
 			// Send message as bot using ChatManager with proper bot actor format
 			$this->chatManager->sendMessage(
@@ -195,26 +199,27 @@ class TimeMonitorService {
 	/**
 	 * Generate warning message based on warning type
 	 */
-	private function generateWarningMessage(string $warningType, LogEntry $item, float $elapsedMinutes, int $plannedMinutes): string {
+	private function generateWarningMessage(string $warningType, LogEntry $item, float $elapsedMinutes, int $plannedMinutes, string $lang = 'en'): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
 		$title = $item->getDetails();
 		$elapsedInt = (int)ceil($elapsedMinutes);
 		$config = $this->getTimeMonitoringConfig();
 		
 		switch ($warningType) {
 			case 'approaching':
-				return sprintf('⏰ **Time Check**: "%s" is approaching time limit (%d of %d minutes used)', $title, $elapsedInt, $plannedMinutes);
+				return sprintf('⏰ **' . $l->t('Time Check') . '**: ' . $l->t('"%s" is approaching time limit (%d of %d minutes used)'), $title, $elapsedInt, $plannedMinutes);
 				
 			case 'overtime':
-				return sprintf('⚠️ **Time Alert**: "%s" has reached planned time (%d min planned, %d min elapsed)', $title, $plannedMinutes, $elapsedInt);
+				return sprintf('⚠️ **' . $l->t('Time Alert') . '**: ' . $l->t('"%s" has reached planned time (%d min planned, %d min elapsed)'), $title, $plannedMinutes, $elapsedInt);
 				
 			case 'overtime_critical':
 				$overtimeMinutes = $elapsedInt - $plannedMinutes;
 				$overtimePercent = round(($config['overtime_threshold'] - 1.0) * 100);
-				return sprintf('🚨 **Overtime Alert**: "%s" has exceeded time limit by %d%% (%d min over, %d min planned, %d min elapsed)', 
+				return sprintf('🚨 **' . $l->t('Overtime Alert') . '**: ' . $l->t('"%s" has exceeded time limit by %d%% (%d min over, %d min planned, %d min elapsed)'), 
 					$title, $overtimePercent, $overtimeMinutes, $plannedMinutes, $elapsedInt);
 				
 			default:
-				return sprintf('⏰ Time monitoring alert for "%s"', $title);
+				return sprintf('⏰ ' . $l->t('Time monitoring alert for "%s"'), $title);
 		}
 	}
 

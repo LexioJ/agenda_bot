@@ -9,14 +9,17 @@ declare(strict_types=1);
 
 namespace OCA\AgendaBot\Service;
 
+use OCA\AgendaBot\AppInfo\Application;
 use OCA\Talk\Manager;
 use OCA\Talk\Participant;
+use OCP\L10N\IFactory;
 use Psr\Log\LoggerInterface;
 
 class PermissionService {
 	public function __construct(
 		private Manager $talkManager,
 		private LoggerInterface $logger,
+		private IFactory $l10nFactory,
 	) {
 	}
 
@@ -164,24 +167,27 @@ class PermissionService {
 	/**
 	 * Get user-friendly error message for permission denied
 	 */
-	public function getPermissionDeniedMessage(string $action = 'perform this action'): string {
-		return "🔒 **Permission Denied**\n\n" .
-			   "Only room moderators and owners can {$action}.";
+	public function getPermissionDeniedMessage(string $action = 'perform this action', string $lang = 'en'): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		return "🔒 **" . $l->t('Permission Denied') . "**\n\n" .
+			   $l->t('Only room moderators and owners can %s.', [$action]);
 	}
 
 	/**
 	 * Get permission denied message for agenda adding commands
 	 */
-	public function getAddAgendaDeniedMessage(): string {
-		return "🔒 **Permission Denied**\n\n" .
-			   "Only moderators, owners, and regular users can add agenda items.";
+	public function getAddAgendaDeniedMessage(string $lang = 'en'): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		return "🔒 **" . $l->t('Permission Denied') . "**\n\n" .
+			   $l->t('Only moderators, owners, and regular users can add agenda items.');
 	}
 
 	/**
 	 * Get permission denied message for view-only users
 	 */
-	public function getViewOnlyDeniedMessage(): string {
-		return "🔒 **Permission Denied**\n\n" .
-			   "You can only view the agenda status and help.";
+	public function getViewOnlyDeniedMessage(string $lang = 'en'): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		return "🔒 **" . $l->t('Permission Denied') . "**\n\n" .
+			   $l->t('You can only view the agenda status and help.');
 	}
 }
