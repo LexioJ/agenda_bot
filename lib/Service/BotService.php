@@ -50,8 +50,13 @@ class BotService {
 	}
 
 	protected function installLanguage(string $secret, string $lang): void {
-		$libL10n = $this->l10nFactory->get('lib', $lang);
-		$langName = $libL10n->t('__language_name__');
+		// Define language names explicitly
+		$languageNames = [
+			'en' => 'English',
+			'de' => 'Deutsch',
+		];
+		
+		$langName = $languageNames[$lang] ?? $lang;
 		
 		// Get localized strings
 		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
