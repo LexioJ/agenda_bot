@@ -118,6 +118,8 @@ class TimeMonitorService {
 
 	/**
 	 * Determine if a warning should be sent based on progress ratio
+	 * Ensures warnings are sent in proper sequence: approaching → overtime → overtime_critical
+	 * Never sends lower-level warnings after higher-level ones have been sent
 	 */
 	private function determineWarningType(float $progressRatio, LogEntry $item): ?string {
 		$config = $this->getTimeMonitoringConfig();
@@ -131,13 +133,46 @@ class TimeMonitorService {
 		$warningThreshold100 = $config['warning_threshold_100'];
 		$warningThreshold80 = $config['warning_threshold_80'];
 		
-		// Check each warning level in order of severity, ensuring we only send each warning once
-		if ($progressRatio >= $overtimeThreshold && !$this->hasWarningBeenSent($item, 'overtime_critical')) {
-			return 'overtime_critical'; // Configurable % over time
-		} elseif ($progressRatio >= $warningThreshold100 && !$this->hasWarningBeenSent($item, 'overtime')) {
-			return 'overtime'; // Exactly at or past planned time
-		} elseif ($progressRatio >= $warningThreshold80 && !$this->hasWarningBeenSent($item, 'approaching')) {
-			return 'approaching'; // 80% of planned time reached
+		// Check what warnings have already been sent to ensure proper progression
+		$approachingSent = $this->hasWarningBeenSent($item, 'approaching');
+		$overtimeSent = $this->hasWarningBeenSent($item, 'overtime');
+		$overtimeCriticalSent = $this->hasWarningBeenSent($item, 'overtime_critical');
+		
+		$this->logger->debug(sprintf(
+			"TimeMonitor: Item %d warnings status - approaching:%s, overtime:%s, critical:%s",
+			$item->getId(),
+			$approachingSent ? 'sent' : 'not-sent',
+			$overtimeSent ? 'sent' : 'not-sent',
+			$overtimeCriticalSent ? 'sent' : 'not-sent'
+		));
+		
+		// Determine the next appropriate warning based on progression and current ratio
+		if ($progressRatio >= $overtimeThreshold) {
+			// We're in overtime critical zone - send only if not already sent
+			if (!$overtimeCriticalSent) {
+				$this->logger->debug(sprintf("TimeMonitor: Item %d triggering overtime_critical warning", $item->getId()));
+				return 'overtime_critical';
+			} else {
+				$this->logger->debug(sprintf("TimeMonitor: Item %d overtime_critical already sent, skipping", $item->getId()));
+			}
+		} elseif ($progressRatio >= $warningThreshold100) {
+			// We're at/past planned time - send only if not already sent AND overtime_critical hasn't been sent
+			if (!$overtimeSent && !$overtimeCriticalSent) {
+				$this->logger->debug(sprintf("TimeMonitor: Item %d triggering overtime warning", $item->getId()));
+				return 'overtime';
+			} else {
+				$this->logger->debug(sprintf("TimeMonitor: Item %d overtime blocked (overtime:%s, critical:%s)", 
+					$item->getId(), $overtimeSent ? 'sent' : 'not-sent', $overtimeCriticalSent ? 'sent' : 'not-sent'));
+			}
+		} elseif ($progressRatio >= $warningThreshold80) {
+			// We're approaching limit - send only if no higher warnings have been sent
+			if (!$approachingSent && !$overtimeSent && !$overtimeCriticalSent) {
+				$this->logger->debug(sprintf("TimeMonitor: Item %d triggering approaching warning", $item->getId()));
+				return 'approaching';
+			} else {
+				$this->logger->debug(sprintf("TimeMonitor: Item %d approaching blocked (approaching:%s, overtime:%s, critical:%s)", 
+					$item->getId(), $approachingSent ? 'sent' : 'not-sent', $overtimeSent ? 'sent' : 'not-sent', $overtimeCriticalSent ? 'sent' : 'not-sent'));
+			}
 		}
 		
 		return null;
