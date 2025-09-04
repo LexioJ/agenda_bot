@@ -21,6 +21,7 @@ use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use OCP\IConfig;
+use OCP\L10N\IFactory;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -35,6 +36,7 @@ class BotInvokeListener implements IEventListener {
 		protected CommandParser $commandParser,
 		protected IConfig $config,
 		protected LoggerInterface $logger,
+		protected IFactory $l10nFactory,
 	) {
 	}
 
@@ -47,11 +49,7 @@ class BotInvokeListener implements IEventListener {
 			return;
 		}
 
-		// Parse URL parts and handle missing language gracefully
-		$parts = explode('/', $event->getBotUrl(), 4);
-		$appId = $parts[2] ?? null;
-		$lang = $parts[3] ?? 'en'; // Default to 'en' if no language specified
-		
+		[,, $appId, $lang] = explode('/', $event->getBotUrl(), 4);
 		if ($appId !== Application::APP_ID || !in_array($lang, Bot::SUPPORTED_LANGUAGES, true)) {
 			return;
 		}
@@ -60,6 +58,7 @@ class BotInvokeListener implements IEventListener {
 	}
 
 	public function receiveWebhook(string $lang, BotInvokeEvent $event): void {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
 		$data = $event->getMessage();
 		
 		if ($data['type'] === 'Like') {
@@ -71,7 +70,7 @@ class BotInvokeListener implements IEventListener {
 		if ($data['type'] === 'Join') {
 			// Bot has been activated/enabled in the room - show welcome message
 			$token = $data['object']['id'];
-			$welcome = $this->getBotWelcomeMessage($token, $data['actor'] ?? []);
+			$welcome = $this->getBotWelcomeMessage($lang, $token, $data['actor'] ?? []);
 			$event->addAnswer($welcome, true);
 			return;
 		}
@@ -84,7 +83,7 @@ class BotInvokeListener implements IEventListener {
 			// Check for commands first
 			$command = $this->commandParser->parseCommand($message, $token);
 			if ($command) {
-				$response = $this->handleCommand($command, $data['actor'] ?? []);
+				$response = $this->handleCommand($command, $data['actor'] ?? [], $lang);
 				if ($response) {
 					$event->addAnswer($response, true);
 					return;
@@ -95,7 +94,7 @@ class BotInvokeListener implements IEventListener {
 			// Check if this is an agenda item
 			$agendaData = $this->agendaService->parseAgendaItem($message);
 			if ($agendaData) {
-				$result = $this->agendaService->addAgendaItem($token, $agendaData, $data['actor'] ?? null);
+				$result = $this->agendaService->addAgendaItem($token, $agendaData, $data['actor'] ?? null, $lang);
 				if ($result['success']) {
 					$event->addAnswer($result['message'], true);
 				} else {
@@ -113,7 +112,7 @@ class BotInvokeListener implements IEventListener {
 			// Welcome message when bot is activated in conversation
 			if ($data['object']['name'] === 'bot_enabled' ||
 				$data['object']['name'] === 'bot_installed') {
-				$welcome = $this->getBotWelcomeMessage($token, $data['actor'] ?? []);
+				$welcome = $this->getBotWelcomeMessage($lang, $token, $data['actor'] ?? []);
 				$event->addAnswer($welcome, true);
 				return;
 			}
@@ -126,10 +125,10 @@ class BotInvokeListener implements IEventListener {
 					$items = $this->agendaService->getAgendaItems($token);
 					if (!empty($items)) {
 						// Auto-set first incomplete item as current
-						$this->autoSetFirstIncompleteItemAsCurrent($token);
+						$this->autoSetFirstIncompleteItemAsCurrent($token, $lang);
 						
 						// Show current agenda status
-						$status = $this->agendaService->getAgendaStatus($token);
+						$status = $this->agendaService->getAgendaStatus($token, $lang);
 						$event->addAnswer($status, true);
 					}
 					// No message when agenda is empty - silent start
@@ -141,7 +140,8 @@ class BotInvokeListener implements IEventListener {
 				if ($displayName === '') {
 					return;
 				}
-				$displayName = $displayName . ' (guest)';
+				$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+				$displayName = $l->t('%s (guest)', [$displayName]);
 			} elseif (str_starts_with($data['actor']['id'], 'federated_users/')) {
 				$cloudIdServer = explode('@', $data['actor']['id']);
 				$displayName .= ' (' . array_pop($cloudIdServer) . ')';
@@ -152,7 +152,7 @@ class BotInvokeListener implements IEventListener {
 			} elseif ($data['object']['name'] === 'call_ended' || $data['object']['name'] === 'call_ended_everyone') {
 				$this->summaryService->logCallEnd($token);
 				
-			$summary = $this->summaryService->generateAgendaSummary($token, $data['target']['name']);
+			$summary = $this->summaryService->generateAgendaSummary($token, $data['target']['name'], $lang);
 				if ($summary !== null) {
 					$event->addAnswer($summary['summary'], false);
 				}
@@ -163,7 +163,7 @@ class BotInvokeListener implements IEventListener {
 	/**
 	 * Auto-set the first incomplete agenda item as current when call starts
 	 */
-	private function autoSetFirstIncompleteItemAsCurrent(string $token): void {
+	private function autoSetFirstIncompleteItemAsCurrent(string $token, string $lang): void {
 		// Check if there's already a current item
 		$currentItem = $this->agendaService->getCurrentAgendaItem($token);
 		if ($currentItem !== null) {
@@ -175,19 +175,21 @@ class BotInvokeListener implements IEventListener {
 		$incompleteItems = $this->logEntryMapper->findIncompleteAgendaItems($token);
 		if (!empty($incompleteItems)) {
 			$firstItem = $incompleteItems[0];
-			$this->agendaService->setCurrentAgendaItem($token, $firstItem->getOrderPosition());
+			$this->agendaService->setCurrentAgendaItem($token, $firstItem->getOrderPosition(), null, $lang);
 		}
 	}
 
 	/**
 	 * Get bot welcome message with help
 	 */
-	private function getBotWelcomeMessage(string $token = '', array $actorData = []): string {
-		return "### 🤖 **Welcome to Agenda Bot!**\n\n" .
-			   "I'm here to help you manage your meeting agenda and track time.\n\n" .
-			   $this->agendaService->getAgendaHelp($token, $actorData ?: null) . "\n\n" .
-			   "🎉 **Ready to get started?** Try adding your first agenda item:\n" .
-			   "• `agenda: Welcome & introductions (5 min)`";
+	private function getBotWelcomeMessage(string $lang, string $token = '', array $actorData = []): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
+		return "### 🤖 **" . $l->t('Welcome to Agenda Bot!') . "**\n\n" .
+			   $l->t("I'm here to help you manage your meeting agenda and track time.") . "\n\n" .
+			   $this->agendaService->getAgendaHelp($token, $actorData ?: null, $lang) . "\n\n" .
+			   "🎉 **" . $l->t('Ready to get started? Try adding your first agenda item:') . "**\n" .
+			   "• `" . $l->t('agenda: Welcome & introductions (5 min)') . "`";
 	}
 
 	/**
@@ -227,10 +229,11 @@ class BotInvokeListener implements IEventListener {
 		if (isset($data['object']['content'])) {
 			$messageData = json_decode($data['object']['content'], true);
 			$messageContent = $messageData['message'] ?? '';
-			$isSummaryMessage = str_contains($messageContent, 'Meeting Agenda Summary');
+			// Detect summary by looking for "Generated by Agenda bot 🤖" signature
+			$isSummaryMessage = str_contains($messageContent, 'Generated by Agenda bot 🤖');
 			$this->logger->debug('Found message content in reaction event', [
 				'content_length' => strlen($messageContent),
-				'contains_summary_header' => $isSummaryMessage,
+				'contains_bot_signature' => $isSummaryMessage,
 				'content_preview' => substr($messageContent, 0, 100)
 			]);
 		} else {
@@ -269,47 +272,44 @@ class BotInvokeListener implements IEventListener {
 	/**
 	 * Handle bot commands
 	 */
-	private function handleCommand(array $command, array $actorData = []): ?string {
+	private function handleCommand(array $command, array $actorData = [], string $lang = 'en'): ?string {
 		switch ($command['command']) {
 			case 'status':
-				return $this->agendaService->getAgendaStatus($command['token']);
+				return $this->agendaService->getAgendaStatus($command['token'], $lang);
 
 			case 'help':
-				return $this->agendaService->getAgendaHelp($command['token'], $actorData ?: null);
+				return $this->agendaService->getAgendaHelp($command['token'], $actorData ?: null, $lang);
 
 			case 'clear':
-				return $this->agendaService->clearAgenda($command['token'], $actorData ?: null);
+				return $this->agendaService->clearAgenda($command['token'], $actorData ?: null, $lang);
 
 			case 'complete':
-				return $this->agendaService->completeAgendaItem($command['token'], $command['item'], $actorData ?: null);
-
-			case 'complete_current':
-				return $this->agendaService->completeCurrentAgendaItem($command['token']);
+				return $this->agendaService->completeItem($command['token'], $command['item'], $actorData ?: null, $lang);
 
 			case 'reopen':
-				return $this->agendaService->reopenAgendaItem($command['token'], $command['item'], $actorData ?: null);
+				return $this->agendaService->reopenAgendaItem($command['token'], $command['item'], $actorData ?: null, $lang);
 
 			case 'next':
-				return $this->agendaService->setCurrentAgendaItem($command['token'], $command['item'], $actorData ?: null);
+				return $this->agendaService->setCurrentAgendaItem($command['token'], $command['item'], $actorData ?: null, $lang);
 
 			case 'reorder':
-				return $this->agendaService->reorderAgendaItems($command['token'], $command['positions'], $actorData ?: null);
+				return $this->agendaService->reorderAgendaItems($command['token'], $command['positions'], $actorData ?: null, $lang);
 
 			case 'move':
-				return $this->agendaService->moveAgendaItem($command['token'], $command['from'], $command['to'], $actorData ?: null);
+				return $this->agendaService->moveAgendaItem($command['token'], $command['from'], $command['to'], $actorData ?: null, $lang);
 
 			case 'swap':
-				return $this->agendaService->swapAgendaItems($command['token'], $command['item1'], $command['item2'], $actorData ?: null);
+				return $this->agendaService->swapAgendaItems($command['token'], $command['item1'], $command['item2'], $actorData ?: null, $lang);
 
 			case 'remove':
-				return $this->agendaService->removeAgendaItem($command['token'], $command['item'], $actorData ?: null);
+				return $this->agendaService->removeAgendaItem($command['token'], $command['item'], $actorData ?: null, $lang);
 
 			case 'time_config':
-				return $this->agendaService->getTimeMonitoringStatus();
+				return $this->agendaService->getTimeMonitoringStatus($lang);
 
 			case 'time_enable':
 				$enabled = $command['action'] === 'enable';
-				$result = $this->agendaService->setTimeMonitoringConfig(['enabled' => $enabled], $command['token'], $actorData ?: null);
+				$result = $this->agendaService->setTimeMonitoringConfig(['enabled' => $enabled], $command['token'], $actorData ?: null, $lang);
 				return $result['message'];
 
 			case 'time_thresholds':
@@ -322,7 +322,7 @@ class BotInvokeListener implements IEventListener {
 				return $result['message'];
 
 			case 'cleanup':
-				return $this->agendaService->removeCompletedItems($command['token'], $actorData ?: null);
+				return $this->agendaService->removeCompletedItems($command['token'], $actorData ?: null, $lang);
 
 			default:
 				return null;

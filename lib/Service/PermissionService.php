@@ -9,14 +9,17 @@ declare(strict_types=1);
 
 namespace OCA\AgendaBot\Service;
 
+use OCA\AgendaBot\AppInfo\Application;
 use OCA\Talk\Manager;
 use OCA\Talk\Participant;
+use OCP\L10N\IFactory;
 use Psr\Log\LoggerInterface;
 
 class PermissionService {
 	public function __construct(
 		private Manager $talkManager,
 		private LoggerInterface $logger,
+		private IFactory $l10nFactory,
 	) {
 	}
 
@@ -63,6 +66,12 @@ class PermissionService {
 	public function isActorModerator(string $token, array $actorData): bool {
 		// Extract user ID from actor data
 		$actorId = $actorData['id'] ?? '';
+		$actorType = $actorData['type'] ?? null;
+		
+		// Handle bot actors - bots have full permissions (considered as moderators)
+		if ($actorType === 'Application' && isset($actorData['id']) && str_contains($actorData['id'], 'bots/')) {
+			return true;
+		}
 		
 		// Note: We don't skip guests here since type 6 (Guest with moderator permissions) should be allowed
 		// The talkParticipantType will determine actual permissions
@@ -111,10 +120,19 @@ class PermissionService {
 	 */
 	public function canAddAgendaItems(string $token, array $actorData): bool {
 		$actorId = $actorData['id'] ?? null;
+		$actorType = $actorData['type'] ?? null;
 		$participantType = $actorData['talkParticipantType'] ?? null;
 
+		// Handle bot actors - bots have full permissions
+		if ($actorType === 'Application' && isset($actorData['id']) && str_contains($actorData['id'], 'bots/')) {
+			return true;
+		}
+
 		if ($participantType === null) {
-			$this->logger->error('Missing talkParticipantType in actor data for canAddAgendaItems', ['actorData' => $actorData]);
+			$this->logger->error('Missing talkParticipantType in actor data for canAddAgendaItems', [
+				'actorData' => $actorData,
+				'token' => $token
+			]);
 			throw new \Exception('Missing talkParticipantType in actor data');
 		}
 
@@ -141,7 +159,13 @@ class PermissionService {
 	 * @throws \Exception If the permission check fails
 	 */
 	public function canViewAgenda(string $token, array $actorData): bool {
+		$actorType = $actorData['type'] ?? null;
 		$participantType = $actorData['talkParticipantType'] ?? null;
+
+		// Handle bot actors - bots have full permissions
+		if ($actorType === 'Application' && isset($actorData['id']) && str_contains($actorData['id'], 'bots/')) {
+			return true;
+		}
 
 		if ($participantType === null) {
 			throw new \Exception('Missing talkParticipantType in actor data');
@@ -164,24 +188,27 @@ class PermissionService {
 	/**
 	 * Get user-friendly error message for permission denied
 	 */
-	public function getPermissionDeniedMessage(string $action = 'perform this action'): string {
-		return "🔒 **Permission Denied**\n\n" .
-			   "Only room moderators and owners can {$action}.";
+	public function getPermissionDeniedMessage(string $action = 'perform this action', string $lang = 'en'): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		return "🔒 **" . $l->t('Permission Denied') . "**\n\n" .
+			   $l->t('Only room moderators and owners can %s.', [$action]);
 	}
 
 	/**
 	 * Get permission denied message for agenda adding commands
 	 */
-	public function getAddAgendaDeniedMessage(): string {
-		return "🔒 **Permission Denied**\n\n" .
-			   "Only moderators, owners, and regular users can add agenda items.";
+	public function getAddAgendaDeniedMessage(string $lang = 'en'): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		return "🔒 **" . $l->t('Permission Denied') . "**\n\n" .
+			   $l->t('Only moderators, owners, and regular users can add agenda items.');
 	}
 
 	/**
 	 * Get permission denied message for view-only users
 	 */
-	public function getViewOnlyDeniedMessage(): string {
-		return "🔒 **Permission Denied**\n\n" .
-			   "You can only view the agenda status and help.";
+	public function getViewOnlyDeniedMessage(string $lang = 'en'): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		return "🔒 **" . $l->t('Permission Denied') . "**\n\n" .
+			   $l->t('You can only view the agenda status and help.');
 	}
 }

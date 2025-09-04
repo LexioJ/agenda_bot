@@ -17,8 +17,7 @@ class CommandParser {
 	public const STATUS_COMMAND_PATTERN = '/^agenda\s*(status|list)$/i';
 	public const HELP_COMMAND_PATTERN = '/^agenda\s*help$/i';
 	public const CLEAR_COMMAND_PATTERN = '/^agenda\s*clear$/i';
-	public const COMPLETE_PATTERN = '/^(complete|done|close)\s*:\s*(\d+)$/i';
-	public const COMPLETE_CURRENT_PATTERN = '/^(complete|done|close)\s*:?\s*$/i';
+	public const COMPLETE_PATTERN = '/^(complete|done|close)\s*:?\s*(\d+)?$/i';
 	public const REOPEN_PATTERN = '/^(incomplete|undone|reopen)\s*:\s*(\d+)$/i';
 	public const NEXT_PATTERN = '/^next\s*:\s*(\d+)$/i';
 	public const REORDER_PATTERN = '/^reorder\s*:\s*((?:\d+,?\s*)+)$/i';
@@ -28,7 +27,6 @@ class CommandParser {
 	public const TIME_CONFIG_PATTERN = '/^time\s+(config|status)$/i';
 	public const TIME_ENABLE_PATTERN = '/^time\s+(enable|disable)$/i';
 	public const TIME_THRESHOLDS_PATTERN = '/^time\s+thresholds\s+(\d+)\s+(\d+)\s+(\d+)$/i';
-	public const TIME_DEBUG_PATTERN = '/^time\s+(debug|test)$/i';
 	public const CLEANUP_PATTERN = '/^(agenda\s+)?(cleanup|clean)$/i';
 
 	/**
@@ -62,22 +60,13 @@ class CommandParser {
 			];
 		}
 
-		// Complete command with specific item number
+		// Complete command - handles both numbered and non-numbered completion
 		if (preg_match(self::COMPLETE_PATTERN, $message, $matches)) {
 			return [
 				'command' => 'complete',
 				'token' => $token,
 				'action' => strtolower($matches[1]),
-				'item' => (int)$matches[2]
-			];
-		}
-
-		// Complete current item command (without number)
-		if (preg_match(self::COMPLETE_CURRENT_PATTERN, $message, $matches)) {
-			return [
-				'command' => 'complete_current',
-				'token' => $token,
-				'action' => strtolower($matches[1])
+				'item' => isset($matches[2]) && $matches[2] !== '' ? (int)$matches[2] : null
 			];
 		}
 
@@ -170,15 +159,6 @@ class CommandParser {
 		}
 
 
-		// Time debug command
-		if (preg_match(self::TIME_DEBUG_PATTERN, $message, $matches)) {
-			return [
-				'command' => 'time_debug',
-				'token' => $token,
-				'action' => strtolower($matches[1])
-			];
-		}
-
 		// Cleanup command
 		if (preg_match(self::CLEANUP_PATTERN, $message, $matches)) {
 			return [
@@ -196,34 +176,5 @@ class CommandParser {
 	 */
 	public function isCommand(string $message): bool {
 		return $this->parseCommand($message, '') !== null;
-	}
-
-	/**
-	 * Get command help text
-	 */
-	public function getCommandHelp(): string {
-		return "### 📋 **Agenda Commands:**\n\n" .
-			   "**Adding Items:**\n" .
-			   "• `agenda: Topic name (15 min)` - Add agenda item with time\n" .
-			   "• `topic: Meeting topic (1h)` - Alternative syntax\n" .
-			   "• `item: General discussion` - Add item (10 min default)\n" .
-			   "• `insert: New topic (30 min)` - Insert agenda item\n" .
-			   "• `add: Another topic (2 hours)` - Add agenda item\n" .
-			   "\n**Time Formats:** `(5 m)`, `(10 min)`, `(1h)`, `(2 hours)`, `(90 min)`\n\n" .
-			   "**Status & Management:**\n" .
-			   "• `agenda status` - Show current agenda status\n" .
-			   "• `agenda list` - Show agenda items\n" .
-			   "• `agenda clear` - Clear all agenda items\n" .
-			   "• `next: 2` - Set agenda item 2 as current\n\n" .
-			   "**Complete/Reopen Items:**\n" .
-			   "• `complete: 1` / `done: 1` / `close: 1` - Mark item as completed\n" .
-			   "• `incomplete: 1` / `undone: 1` / `reopen: 1` - Reopen completed item\n\n" .
-			   "**Reorder & Management:**\n" .
-			   "• `reorder: 2,1,4,3` - Reorder agenda items\n" .
-			   "• `move: 3 to 1` - Move item 3 to position 1\n" .
-			   "• `swap: 1,3` - Swap agenda items 1 and 3\n" .
-			   "• `remove: 2` / `delete: 2` - Remove agenda item 2\n\n" .
-			   "**Get Help:**\n" .
-			   "• `agenda help` - Show this help message";
 	}
 }
