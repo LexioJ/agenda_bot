@@ -39,3 +39,6 @@ Thumbs.db
 # Backup files
 *.bak
 *~
+
+# Local operational docs
+WARP.md

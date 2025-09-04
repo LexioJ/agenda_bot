@@ -145,10 +145,10 @@ add: Follow-up actions
    "agenda list" command then shows:
    ```
    📋 Agenda Status
-   ⏸️ 1. Welcome & introductions (5 min)
-   ⏸️ 2. Project updates (20 min)
-   ⏸️ 3. Budget review (15 min)
-   ⏸️ 4. Next steps (10 min)
+   📍 1. Welcome & introductions (5 min)
+   📍 2. Project updates (20 min)
+   📍 3. Budget review (15 min)
+   📍 4. Next steps (10 min)
    ```
 
 2. **During the meeting:**
@@ -179,7 +179,7 @@ add: Follow-up actions
       
       ✅ Completed Items
       Item 1 (10-9 min) 👍
-      ⏸️ Remaining Items
+      📍 Remaining Items
       Item 2 (3 min)
       
       🧹 Remove completed items from agenda?
@@ -336,7 +336,7 @@ The Agenda Bot uses the `OCA\AgendaBot` namespace and `ab_` database prefixes, e
 ### Meeting Analytics
 - **Completion rates** - Track % of agenda items completed
 - **Time efficiency** - Compare planned vs. actual duration
-- **Progress indicators** - Visual status with ✅ ⏸️ ➡️ emojis
+- **Progress indicators** - Visual status with ✅ 📍 ➡️ emojis
 - **Timing insights** - On-time (👍) vs. overtime (⏰) completion tracking
 - **Summary exports** - Detailed meeting reports with statistics
 

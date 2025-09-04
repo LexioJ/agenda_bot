@@ -17,8 +17,6 @@ use OCP\L10N\IFactory;
 
 class SummaryService {
 
-	private $l;
-
 	public function __construct(
 		protected LogEntryMapper $logEntryMapper,
 		protected ITimeFactory $timeFactory,
@@ -26,7 +24,6 @@ class SummaryService {
 		protected AgendaService $agendaService,
 		protected IFactory $l10nFactory,
 	) {
-		$this->l = $l10nFactory->get('agenda_bot');
 	}
 
 	public function processMessage(string $message, array $data): bool {
@@ -90,7 +87,7 @@ class SummaryService {
 				// Format timing display: planned+diff or planned-diff
 				if ($timeDiff > 0) {
 					$timingDisplay = $l->t('(%d+%d min)', [$plannedDuration, $timeDiff]);
-					$statusIcon = " " . $this->l->t('Time Warning');
+					$statusIcon = " " . $l->t('Time Warning');
 				} elseif ($timeDiff < 0) {
 					$timingDisplay = $l->t('(%d%d min)', [$plannedDuration, $timeDiff]); // negative diff
 					$statusIcon = " 👍";
@@ -105,7 +102,7 @@ class SummaryService {
 		}
 
 		if (!empty($agendaData['incomplete_items'])) {
-			$summary .= "#### ⏸️ " . $l->t('Remaining Items') . "\n";
+			$summary .= "#### " . $l->t('Pending') . " " . $l->t('Remaining Items') . "\n";
 			foreach ($agendaData['incomplete_items'] as $item) {
 				$summary .= $item['position'] . ". " . $item['title'] . " (" . $item['duration'] . " " . $l->t('min') . ")\n";
 			}
@@ -120,6 +117,9 @@ class SummaryService {
 			$summary .= "\n\n🧹 **" . $l->t('Remove completed items from agenda?') . "**\n";
 			$summary .= "*" . $l->t("Moderators/Owners: Reply with 'agenda cleanup'") . "*";
 		}
+
+		// Append a stable, language-agnostic marker for reaction handling
+		$summary .= "\n\n" . Application::SUMMARY_MARKER;
 
 		return [
 			'summary' => $summary,

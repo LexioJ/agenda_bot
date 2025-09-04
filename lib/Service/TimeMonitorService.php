@@ -166,8 +166,9 @@ class TimeMonitorService {
 				return;
 			}
 
-			// Get room language or fallback to 'en'
-			$lang = $room->getLanguage() ?: 'en';
+			// Use default language 'en' for time warnings
+			// TODO: Implement proper room language detection when available
+			$lang = 'en';
 			
 			// Generate warning message based on type with room language
 			$message = $this->generateWarningMessage($warningType, $item, $elapsedMinutes, $plannedMinutes, $lang);

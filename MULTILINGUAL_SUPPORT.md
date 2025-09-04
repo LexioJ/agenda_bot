@@ -36,6 +36,7 @@ The following services have been updated to support l10n:
 - Added `IFactory $l10nFactory` dependency injection
 - Updated `generateWarningMessage()` to support language parameter
 - All time monitoring alerts now use l10n
+- **Note**: Currently uses 'en' fallback for background job warnings (room language detection limitation)
 
 #### BotInvokeListener
 - Updated to pass language parameter to all service method calls
@@ -165,11 +166,26 @@ Each language bot:
 3. Each bot gets unique identifier: `{secret}{lang}` (e.g., `abc123en`, `abc123de`)
 4. Bot URL includes language: `nextcloudapp://agenda_bot/{lang}`
 
+## Current Limitations
+
+### Background Job Language Detection
+- **TimeMonitorService**: Background jobs cannot access bot URL language context
+- Currently uses 'en' (English) fallback for time monitoring warnings
+- Room-based language detection methods not available in current Talk API
+- **Impact**: Time warnings always sent in English, regardless of room language
+
+### Language Context Availability
+- Interactive bot commands: ✅ Full language support (via bot URL)
+- Background time monitoring: ⚠️ English only (no language context available)
+- Event-driven responses: ✅ Full language support (via event data)
+
 ## Future Enhancements
+- **Room language detection**: Implement proper room-based language detection when API becomes available
 - User preference-based language selection
 - Room-specific language settings
 - Dynamic language switching
 - Additional language support (French, Spanish, Italian, etc.)
+- Background job language context preservation
 
 ## Compatibility
 - Maintains full backward compatibility

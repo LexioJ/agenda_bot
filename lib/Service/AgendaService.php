@@ -162,6 +162,7 @@ class AgendaService {
 				'duration' => $entry->getDurationMinutes(),
 				'completed' => $entry->getIsCompleted(),
 				'completed_at' => $entry->getCompletedAt(),
+				'start_time' => $entry->getStartTime(),
 			];
 		}
 
@@ -188,23 +189,29 @@ class AgendaService {
 			
 			// Check if this is the current item
 			if ($currentItem && $currentItem->getOrderPosition() === $item['position']) {
-				$prefix = $l->t('Current Item') . ' **';
+				$prefix = $l->t('Current Item') . ' ';
 				$timeSpent = $this->getTimeSpentOnItem($currentItem);
-				$timeSpentDisplay = $this->formatDurationDisplay($timeSpent);
-				$plannedDisplay = $this->formatDurationDisplay($item['duration']);
-				$timeInfo = "** *(" . $l->t('%s/%s', [$timeSpentDisplay, $plannedDisplay]) . ")*";
+				$timeSpentDisplay = $this->formatDurationDisplay($timeSpent, $lang);
+				$plannedDisplay = $this->formatDurationDisplay($item['duration'], $lang);
+				$timeInfo = " *(" . $l->t('%s/%s', [$timeSpentDisplay, $plannedDisplay]) . ")*";
+				$title = "`{$item['title']}`";
 			} elseif ($item['completed']) {
 				$icon = $l->t('Completed') . ' ';
-				$actualDuration = $this->getActualDurationForCompletedItem($token, $item['position']);
-				$actualDisplay = $this->formatDurationDisplay($actualDuration);
-				$plannedDisplay = $this->formatDurationDisplay($item['duration']);
+				$actualDuration = 0;
+				if (!empty($item['start_time']) && !empty($item['completed_at'])) {
+					$actualDuration = (int) ceil(($item['completed_at'] - $item['start_time']) / 60);
+				}
+				$actualDisplay = $this->formatDurationDisplay($actualDuration, $lang);
+				$plannedDisplay = $this->formatDurationDisplay($item['duration'], $lang);
 				$timeInfo = " *(" . $l->t('%s/%s', [$actualDisplay, $plannedDisplay]) . ")*";
+				$title = $item['title'];
 			} else {
 				$icon = $l->t('Pending') . ' ';
-				$timeInfo = " *(" . $l->t('%s', [$this->formatDurationDisplay($item['duration'])]) . ")*";
+				$timeInfo = " *(" . $l->t('%s', [$this->formatDurationDisplay($item['duration'], $lang)]) . ")*";
+				$title = $item['title'];
 			}
 			
-			$status .= "{$prefix}{$icon}{$item['position']}. {$item['title']}{$timeInfo}\n";
+			$status .= "{$prefix}{$icon}{$item['position']}. {$title}{$timeInfo}\n";
 		}
 
 		return $status;
@@ -247,7 +254,7 @@ class AgendaService {
 		$item->setStartTime($this->timeFactory->now()->getTimestamp());
 		$this->logEntryMapper->update($item);
 
-		return '➡️ ' . $l->t('Set agenda item %d as current: "%s"', [$position, $item->getDetails()]);
+	return '🗣️ ' . $l->t('Set agenda item %d as current: "%s"', [$position, $item->getDetails()]);
 	}
 
 	/**
@@ -340,9 +347,12 @@ class AgendaService {
 	}
 
 	/**
-	 * Mark agenda item as completed (requires moderator permissions)
+	 * Complete an agenda item - handles both current item completion and specific item completion
+	 * If position is null, completes current item and moves to next
+	 * If position is specified and it's the current item, completes it and moves to next
+	 * If position is specified and it's not current, just marks it as completed
 	 */
-	public function completeAgendaItem(string $token, int $position, ?array $actorData = null, string $lang = 'en'): ?string {
+	public function completeItem(string $token, ?int $position = null, ?array $actorData = null, string $lang = 'en'): ?string {
 		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
 		
 		// Check moderator permissions if actor data is provided
@@ -350,69 +360,71 @@ class AgendaService {
 			return $this->permissionService->getPermissionDeniedMessage($l->t('complete agenda items'), $lang);
 		}
 		
-		$item = $this->logEntryMapper->findAgendaItemByPosition($token, $position);
-		if (!$item) {
-			return '❌ ' . $l->t('Agenda item %d not found', [$position]);
-		}
-
-		if ($item->getIsCompleted()) {
-			return 'ℹ️ ' . $l->t('Agenda item %d is already completed: "%s"', [$position, $item->getDetails()]);
-		}
-
-		$item->setIsCompleted(true);
-		$item->setCompletedAt($this->timeFactory->now()->getTimestamp());
-		// Keep startTime for duration calculation, just mark as completed
-		$this->logEntryMapper->update($item);
-
-		$response = '✅ ' . $l->t('Marked agenda item %d as completed: "%s"', [$position, $item->getDetails()]);
-
-		return $response;
-	}
-
-	/**
-	 * Complete the current agenda item and move to next
-	 */
-	public function completeCurrentAgendaItem(string $token, string $lang = 'en'): ?string {
-		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
 		$currentItem = $this->getCurrentAgendaItem($token);
+		$itemToComplete = null;
+		$isCurrentItem = false;
 		
-		if (!$currentItem) {
-			return '❌ ' . $l->t('No current agenda item is active');
-		}
-
-		if ($currentItem->getIsCompleted()) {
-			return 'ℹ️ ' . $l->t('Current agenda item %d is already completed: "%s"', [$currentItem->getOrderPosition(), $currentItem->getDetails()]);
-		}
-
-		// Calculate actual time spent before marking as completed
-		$actualTime = $this->getTimeSpentOnItem($currentItem);
-		$plannedTime = $currentItem->getDurationMinutes();
-		$actualDisplay = $this->formatDurationDisplay($actualTime, $lang);
-		$plannedDisplay = $this->formatDurationDisplay($plannedTime, $lang);
-
-		// Mark as completed
-		$currentItem->setIsCompleted(true);
-		$currentItem->setCompletedAt($this->timeFactory->now()->getTimestamp());
-		// Keep startTime for duration calculation, just mark as completed
-		$this->logEntryMapper->update($currentItem);
-
-		$response = "#### ✅ " . $l->t('Completed current agenda item %d: **"%s"** (%s/%s)', [
-			$currentItem->getOrderPosition(), 
-			$currentItem->getDetails(), 
-			$actualDisplay, 
-			$plannedDisplay
-		]);
-
-		// Always try to move to next incomplete item (the done: command is typically used during calls)
-		$nextItem = $this->moveToNextIncompleteItem($token);
-		if ($nextItem) {
-			$nextPlannedDisplay = $this->formatDurationDisplay($nextItem->getDurationMinutes(), $lang);
-			$response .= "\n➡️ " . $l->t('Moving to next item %d:', [$nextItem->getOrderPosition()]);
-			$response .= "\n#### \"" . $nextItem->getDetails() . "\" (" . $nextPlannedDisplay . ")";
+		// Determine which item to complete
+		if ($position === null) {
+			// No position specified - complete current item
+			if (!$currentItem) {
+				return '❌ ' . $l->t('No current agenda item is active');
+			}
+			$itemToComplete = $currentItem;
+			$isCurrentItem = true;
 		} else {
-			$response .= "\n\n#### 🎉 " . $l->t('All agenda items completed!');
+			// Position specified - find that item
+			$itemToComplete = $this->logEntryMapper->findAgendaItemByPosition($token, $position);
+			if (!$itemToComplete) {
+				return '❌ ' . $l->t('Agenda item %d not found', [$position]);
+			}
+			// Check if the specified item is the current item
+			$isCurrentItem = $currentItem && $currentItem->getOrderPosition() === $position;
 		}
-
+		
+		if ($itemToComplete->getIsCompleted()) {
+			if ($position === null) {
+				return 'ℹ️ ' . $l->t('Current agenda item %d is already completed: "%s"', [$itemToComplete->getOrderPosition(), $itemToComplete->getDetails()]);
+			} else {
+				return 'ℹ️ ' . $l->t('Agenda item %d is already completed: "%s"', [$position, $itemToComplete->getDetails()]);
+			}
+		}
+		
+		// Mark item as completed
+		$itemToComplete->setIsCompleted(true);
+		$itemToComplete->setCompletedAt($this->timeFactory->now()->getTimestamp());
+		$this->logEntryMapper->update($itemToComplete);
+		
+		// Build response based on whether this was the current item
+		if ($isCurrentItem) {
+			// Calculate timing details for current item completion
+			$actualTime = $this->getTimeSpentOnItem($itemToComplete);
+			$plannedTime = $itemToComplete->getDurationMinutes();
+			$actualDisplay = $this->formatDurationDisplay($actualTime, $lang);
+			$plannedDisplay = $this->formatDurationDisplay($plannedTime, $lang);
+			
+			$response = "✅ " . $l->t('Completed agenda item %d: **"%s"** (%s/%s)', [
+				$itemToComplete->getOrderPosition(), 
+				$itemToComplete->getDetails(), 
+				$actualDisplay, 
+				$plannedDisplay
+			]);
+			
+			// Move to next incomplete item since we completed the current one
+			$nextItem = $this->moveToNextIncompleteItem($token);
+			if ($nextItem) {
+				$nextPlannedDisplay = $this->formatDurationDisplay($nextItem->getDurationMinutes(), $lang);
+				$response .= "\n🗣️ " . $l->t('Moving to next item %d:', [$nextItem->getOrderPosition()]);
+				$response .= "\n`" . $nextItem->getDetails() . "`";
+				$response .= "\n*" . $l->t('Planned duration: %s', [$nextPlannedDisplay]) . "*";
+			} else {
+				$response .= "\n\n### 🏁 " . $l->t('All agenda items completed!');
+			}
+		} else {
+			// Just a regular item completion, not the current one
+			$response = '✅ ' . $l->t('Marked agenda item %d as completed: "%s"', [$itemToComplete->getOrderPosition(), $itemToComplete->getDetails()]);
+		}
+		
 		return $response;
 	}
 
@@ -518,9 +530,10 @@ class AgendaService {
 		}
 		
 		if (isset($config['check_interval'])) {
-			$interval = max(30, min(600, (int)$config['check_interval']));
-			$this->config->setAppValue('agenda_bot', 'monitor-check-interval', (string)$interval);
-			$changes[] = $l->t('check interval status', [$interval]);
+			$intervalSeconds = max(30, min(600, (int)$config['check_interval']));
+			$this->config->setAppValue('agenda_bot', 'monitor-check-interval', (string)$intervalSeconds);
+			$minutes = (int) round($intervalSeconds / 60);
+			$changes[] = $l->t('check interval status', [$minutes]);
 		}
 		
 		if (empty($changes)) {
@@ -552,7 +565,8 @@ class AgendaService {
 				$l->t("%.0f%% of planned time", [$config['warning_threshold_100'] * 100]) . "\n";
 			$status .= "• **" . $l->t("Overtime Alert") . "**: " . 
 				$l->t("%.0f%% of planned time", [$config['overtime_threshold'] * 100]) . "\n";
-			$status .= "• **" . $l->t("Check Interval") . "**: " . $l->t("%d minutes (%s)", [5, $l->t("fixed")]) . "\n\n";
+			$minutes = (int) round($config['check_interval'] / 60);
+			$status .= "• **" . $l->t("Check Interval") . "**: " . $l->t("%d minutes (%s)", [$minutes, $l->t("fixed")]) . "\n\n";
 		}
 		
 		$status .= "**" . $l->t("Configuration Commands") . ":**\n";
@@ -910,7 +924,10 @@ class AgendaService {
 		$overdueCount = 0;
 
 		foreach ($completed as $item) {
-			$actualDuration = $this->getActualDurationForCompletedItem($token, $item['position']);
+			$actualDuration = 0;
+			if (!empty($item['start_time']) && !empty($item['completed_at'])) {
+				$actualDuration = (int) ceil(($item['completed_at'] - $item['start_time']) / 60);
+			}
 			$plannedDuration = $item['duration'];
 			$timeDiff = $actualDuration - $plannedDuration;
 			$isOverdue = $timeDiff > 0;

@@ -17,8 +17,7 @@ class CommandParser {
 	public const STATUS_COMMAND_PATTERN = '/^agenda\s*(status|list)$/i';
 	public const HELP_COMMAND_PATTERN = '/^agenda\s*help$/i';
 	public const CLEAR_COMMAND_PATTERN = '/^agenda\s*clear$/i';
-	public const COMPLETE_PATTERN = '/^(complete|done|close)\s*:\s*(\d+)$/i';
-	public const COMPLETE_CURRENT_PATTERN = '/^(complete|done|close)\s*:?\s*$/i';
+	public const COMPLETE_PATTERN = '/^(complete|done|close)\s*:?\s*(\d+)?$/i';
 	public const REOPEN_PATTERN = '/^(incomplete|undone|reopen)\s*:\s*(\d+)$/i';
 	public const NEXT_PATTERN = '/^next\s*:\s*(\d+)$/i';
 	public const REORDER_PATTERN = '/^reorder\s*:\s*((?:\d+,?\s*)+)$/i';
@@ -28,7 +27,6 @@ class CommandParser {
 	public const TIME_CONFIG_PATTERN = '/^time\s+(config|status)$/i';
 	public const TIME_ENABLE_PATTERN = '/^time\s+(enable|disable)$/i';
 	public const TIME_THRESHOLDS_PATTERN = '/^time\s+thresholds\s+(\d+)\s+(\d+)\s+(\d+)$/i';
-	public const TIME_DEBUG_PATTERN = '/^time\s+(debug|test)$/i';
 	public const CLEANUP_PATTERN = '/^(agenda\s+)?(cleanup|clean)$/i';
 
 	/**
@@ -62,22 +60,13 @@ class CommandParser {
 			];
 		}
 
-		// Complete command with specific item number
+		// Complete command - handles both numbered and non-numbered completion
 		if (preg_match(self::COMPLETE_PATTERN, $message, $matches)) {
 			return [
 				'command' => 'complete',
 				'token' => $token,
 				'action' => strtolower($matches[1]),
-				'item' => (int)$matches[2]
-			];
-		}
-
-		// Complete current item command (without number)
-		if (preg_match(self::COMPLETE_CURRENT_PATTERN, $message, $matches)) {
-			return [
-				'command' => 'complete_current',
-				'token' => $token,
-				'action' => strtolower($matches[1])
+				'item' => isset($matches[2]) && $matches[2] !== '' ? (int)$matches[2] : null
 			];
 		}
 
@@ -170,15 +159,6 @@ class CommandParser {
 		}
 
 
-		// Time debug command
-		if (preg_match(self::TIME_DEBUG_PATTERN, $message, $matches)) {
-			return [
-				'command' => 'time_debug',
-				'token' => $token,
-				'action' => strtolower($matches[1])
-			];
-		}
-
 		// Cleanup command
 		if (preg_match(self::CLEANUP_PATTERN, $message, $matches)) {
 			return [
@@ -196,34 +176,5 @@ class CommandParser {
 	 */
 	public function isCommand(string $message): bool {
 		return $this->parseCommand($message, '') !== null;
-	}
-
-	/**
-	 * Get command help text
-	 */
-	public function getCommandHelp(): string {
-		return "### 📋 **" . $this->l->t('Agenda Commands:') . "**\n\n" .
-			   "**" . $this->l->t('Adding Items:') . "**\n" .
-			   "• `" . $this->l->t('Add item with time example') . "` - " . $this->l->t('Add agenda item with time') . "\n" .
-			   "• `" . $this->l->t('Alternative syntax example') . "` - " . $this->l->t('Alternative syntax') . "\n" .
-			   "• `" . $this->l->t('Add default item example') . "` - " . $this->l->t('Add item (10 min default)') . "\n" .
-			   "• `" . $this->l->t('Insert item example') . "` - " . $this->l->t('Add agenda item with time') . "\n" .
-			   "• `" . $this->l->t('Add another item example') . "` - " . $this->l->t('Add agenda item with time') . "\n" .
-			   "\n**" . $this->l->t('Time Formats:') . "** `" . $this->l->t('Time Format Examples') . "`\n\n" .
-			   "**" . $this->l->t('Status & Management:') . "**\n" .
-			   "• `agenda status` - " . $this->l->t('Show current agenda status') . "\n" .
-			   "• `agenda list` - " . $this->l->t('Show agenda items') . "\n" .
-			   "• `agenda clear` - " . $this->l->t('Clear all agenda items') . "\n" .
-			   "• `" . $this->l->t('Set current example') . "` - " . $this->l->t('Set agenda item %d as current', [2]) . "\n\n" .
-			   "**" . $this->l->t('Complete/Reopen Items:') . "**\n" .
-			   "• `" . $this->l->t('Complete item example') . "` - " . $this->l->t('Mark item as completed') . "\n" .
-			   "• `" . $this->l->t('Reopen item example') . "` - " . $this->l->t('Reopen completed item') . "\n\n" .
-			   "**" . $this->l->t('Reorder & Management:') . "**\n" .
-			   "• `" . $this->l->t('Reorder example') . "` - " . $this->l->t('Reorder agenda items') . "\n" .
-			   "• `" . $this->l->t('Move example') . "` - " . $this->l->t('Move item %d to position %d', [3, 1]) . "\n" .
-			   "• `" . $this->l->t('Swap example') . "` - " . $this->l->t('Swap agenda items %d and %d', [1, 3]) . "\n" .
-			   "• `" . $this->l->t('Remove example') . "` - " . $this->l->t('Remove agenda item %d', [2]) . "\n\n" .
-			   "**" . $this->l->t('Get Help:') . "**\n" .
-			   "• `" . $this->l->t('Help example') . "` - " . $this->l->t('Show this help message') . ";";
 	}
 }

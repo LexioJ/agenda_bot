@@ -5,6 +5,24 @@ All notable changes to the Agenda Bot project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.3] - 2025-09-04
+
+### Fixed
+- **Time Monitor Service**: Critical fix for background job failures
+  - Resolved `Call to undefined method OCA\Talk\Room::getLanguage()` error
+  - TimeMonitorService now uses simplified language fallback to 'en' for time warnings
+  - Background job `AgendaTimeMonitorJob` now executes successfully without errors
+  - Time monitoring warnings are properly sent for agenda items exceeding time limits
+- **UI Improvements**: Enhanced agenda item display formatting
+  - Current agenda item now displays with clean code block formatting
+  - Replaced pending emoji ⏸️ with more intuitive 📍 pin emoji across all interfaces
+  - Updated translation files, documentation, and service messages for consistency
+
+### Technical
+- Added TODO comment for future proper room language detection implementation
+- Improved error handling and logging in TimeMonitorService
+- Enhanced visual clarity of current agenda item status display
+
 ## [1.1.2] - 2025-09-02
 
 ### Fixed
@@ -13,6 +31,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed guest name localization in BotInvokeListener
   - Improved language detection from room settings
   - Added proper language parameter passing through service calls
+- **BotInvokeListener**: Corrected invalid call signature to `getCurrentAgendaItem()`
+- **Parser**: Removed dead/unused code (obsolete help builder and time debug pattern)
+
+### Changed
+- **Interval Display**: Normalized all interval-related messages to minutes (was mixed seconds/minutes before)
+- **Status Output**: Duration units in agenda status now consistently respect the selected language
+- **Summary Reactions**: Summary detection is now language-agnostic via a stable internal marker
+- **Translations**: Improved coverage in `en.json` and `de.json` (time monitoring UI, config messages, permission phrases, and formatting strings); aligned help examples
+
+### Performance
+- Reduced database queries by including `start_time` in agenda items and using it to compute actual durations in status and summaries
 
 ## [1.1.1] - 2025-01-XX
 

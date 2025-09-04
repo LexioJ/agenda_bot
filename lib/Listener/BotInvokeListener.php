@@ -165,7 +165,7 @@ class BotInvokeListener implements IEventListener {
 	 */
 	private function autoSetFirstIncompleteItemAsCurrent(string $token, string $lang): void {
 		// Check if there's already a current item
-		$currentItem = $this->agendaService->getCurrentAgendaItem($token, $lang);
+		$currentItem = $this->agendaService->getCurrentAgendaItem($token);
 		if ($currentItem !== null) {
 			// Already have a current item, don't change it
 			return;
@@ -229,10 +229,10 @@ class BotInvokeListener implements IEventListener {
 		if (isset($data['object']['content'])) {
 			$messageData = json_decode($data['object']['content'], true);
 			$messageContent = $messageData['message'] ?? '';
-			$isSummaryMessage = str_contains($messageContent, 'Meeting Agenda Summary');
+			$isSummaryMessage = str_contains($messageContent, Application::SUMMARY_MARKER);
 			$this->logger->debug('Found message content in reaction event', [
 				'content_length' => strlen($messageContent),
-				'contains_summary_header' => $isSummaryMessage,
+				'contains_summary_marker' => $isSummaryMessage,
 				'content_preview' => substr($messageContent, 0, 100)
 			]);
 		} else {
@@ -283,10 +283,7 @@ class BotInvokeListener implements IEventListener {
 				return $this->agendaService->clearAgenda($command['token'], $actorData ?: null, $lang);
 
 			case 'complete':
-				return $this->agendaService->completeAgendaItem($command['token'], $command['item'], $actorData ?: null, $lang);
-
-			case 'complete_current':
-				return $this->agendaService->completeCurrentAgendaItem($command['token'], $lang);
+				return $this->agendaService->completeItem($command['token'], $command['item'], $actorData ?: null, $lang);
 
 			case 'reopen':
 				return $this->agendaService->reopenAgendaItem($command['token'], $command['item'], $actorData ?: null, $lang);

@@ -17,6 +17,7 @@ use OCP\AppFramework\Bootstrap\IRegistrationContext;
 
 class Application extends App implements IBootstrap {
 	public const APP_ID = 'agenda_bot';
+	public const SUMMARY_MARKER = '[[AGENDA_BOT_SUMMARY]]';
 
 	public function __construct() {
 		parent::__construct(self::APP_ID);
