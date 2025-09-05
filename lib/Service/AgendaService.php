@@ -71,13 +71,16 @@ class AgendaService {
 			return null;
 		}
 		
-<<<<<<< Updated upstream
-		$bulkContent = $matches[1];
+		$bulkContent = trim($matches[1]);
+		if (empty($bulkContent)) {
+			return null;
+		}
+		
+		// Split into lines and parse each bullet point
 		$lines = explode("\n", $bulkContent);
 		$items = [];
 		$lineNumber = 2; // Start at 2 because "agenda:" is line 1
 		
-		// Parse each line for bullet items
 		foreach ($lines as $line) {
 			$lineNumber++;
 			$trimmedLine = trim($line);
@@ -87,35 +90,8 @@ class AgendaService {
 				continue;
 			}
 			
-			// Check if line matches bullet format
-			if (preg_match(self::BULLET_ITEM_PATTERN, $trimmedLine, $itemMatches)) {
-				$durationText = isset($itemMatches[3]) && $itemMatches[3] !== '' ? trim($itemMatches[3]) : '';
-				$durationMinutes = $this->parseDurationToMinutes($durationText);
-				
-				$items[] = [
-					'title' => trim($itemMatches[2]),
-=======
-		$bulletContent = trim($matches[1]);
-		if (empty($bulletContent)) {
-			return null;
-		}
-		
-		// Split into lines and parse each bullet point
-		$lines = explode("\n", $bulletContent);
-		$items = [];
-		$lineNumber = 0;
-		
-		foreach ($lines as $line) {
-			$lineNumber++;
-			$line = trim($line);
-			
-			// Skip empty lines
-			if (empty($line)) {
-				continue;
-			}
-			
 			// Check if line matches bullet pattern
-			if (preg_match(self::BULLET_ITEM_PATTERN, $line, $itemMatches)) {
+			if (preg_match(self::BULLET_ITEM_PATTERN, $trimmedLine, $itemMatches)) {
 				$durationText = isset($itemMatches[3]) && $itemMatches[3] !== '' ? trim($itemMatches[3]) : '';
 				$durationMinutes = $this->parseDurationToMinutes($durationText);
 				$title = trim($itemMatches[2]);
@@ -127,12 +103,10 @@ class AgendaService {
 				
 				$items[] = [
 					'title' => $title,
->>>>>>> Stashed changes
 					'duration' => $durationMinutes,
 					'position' => isset($itemMatches[1]) && $itemMatches[1] !== '' ? (int)$itemMatches[1] : null,
 					'line_number' => $lineNumber
 				];
-<<<<<<< Updated upstream
 				
 				// Check for max items limit
 				if (count($items) > self::MAX_BULK_ITEMS) {
@@ -143,24 +117,11 @@ class AgendaService {
 					];
 				}
 			}
-=======
-			}
-			// If line doesn't match bullet pattern, it's invalid - we'll report this in the response
 		}
 		
-		// Enforce maximum item limit
-		if (count($items) > self::MAX_BULK_ITEMS) {
-			return [
-				'items' => [],
-				'error' => 'max_items_exceeded',
-				'max_items' => self::MAX_BULK_ITEMS,
-				'found_items' => count($items)
-			];
-		}
-		
+		// Return null if no valid items found
 		if (empty($items)) {
 			return null;
->>>>>>> Stashed changes
 		}
 		
 		return [
