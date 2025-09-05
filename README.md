@@ -2,9 +2,12 @@
 
 🤖 **A specialized bot for intelligent meeting agenda management and real-time time tracking during Nextcloud Talk calls.**
 
+⚡ **NEW in v1.3.0: Bulk Agenda Creation!** For quickly importing existing agendas from calendar invitations or meeting templates.
+
+⏰ **NEW in v1.2.0: Room-Level Time Monitoring!** Each Talk room can now have its own time monitoring settings, allowing different teams to customize warning thresholds and monitoring behavior while maintaining backward compatibility with global defaults. [Learn more →](docs/ROOM_TIME_MONITORING.md)
+
 🌍 **Now with multi-language support!** Available in English and German, with more languages coming soon.
 
-⚡ **NEW in v1.2.0: Room-Level Time Monitoring!** Each Talk room can now have its own time monitoring settings, allowing different teams to customize warning thresholds and monitoring behavior while maintaining backward compatibility with global defaults. [Learn more →](docs/ROOM_TIME_MONITORING.md)
 
 ## Overview
 
@@ -14,6 +17,7 @@ The Agenda Bot is a comprehensive Nextcloud app that transforms how teams manage
 
 ### 📋 **Advanced Agenda Management**
 - **Flexible item creation** - Natural syntax with multiple formats (`agenda:`, `topic:`, `item:`, `add:`, `insert:`)
+- **Bulk agenda import** - Create multiple items at once from structured lists (v1.3.0)
 - **Intelligent time parsing** - Supports various duration formats: `(5 min)`, `(1h)`, `(2 hours)`, `(90 min)`
 - **Smart positioning** - Automatic position assignment or manual positioning with `#2.` syntax
 - **Complete item lifecycle** - Add, reorder, mark complete/incomplete, remove items
@@ -103,6 +107,27 @@ add: Follow-up actions
 - Include the topic title
 - Optionally specify duration in parentheses like `(15 min)`
 - Default duration is 10 minutes if not specified
+
+#### Bulk Agenda Creation
+
+For quickly importing existing agendas from calendar invitations or meeting templates, use the bulk format:
+
+```
+agenda:
+- Welcome & introductions (5 min)
+- Project status review (20 min)
+- Budget discussion (15 min)  
+- Next steps planning (10 min)
+- Closing remarks
+```
+
+**Bulk Format Features:**
+- Creates multiple items with a single message
+- Supports both `-` and `*` bullet markers
+- Same time format support: `(5 min)`, `(1h)`, `(30m)`, etc.
+- Automatic sequential positioning
+- Maximum 20 items per bulk operation
+- Perfect for copy-pasting agendas from external sources
 
 ### Bot Commands
 
@@ -442,18 +467,6 @@ This project is licensed under the AGPL-3.0-or-later license.
 - **Events:** Full Talk integration (call start/end, messages)
 - **Logging:** Comprehensive debug and error logging
 - **Security:** Input validation and SQL injection protection
-
-## Changelog
-
-### Version 1.0.0
-- **Core Features:** Complete agenda lifecycle management
-- **Smart Time Monitoring:** Background job with configurable thresholds
-- **Permission System:** Role-based access control with guest moderator support
-- **Advanced Commands:** 15+ command patterns with flexible syntax
-- **Meeting Analytics:** Timing insights and completion statistics
-- **Database Optimization:** Indexed queries for performance
-- **Talk Integration:** Full event handling and bot responses
-- **Background Processing:** Independent time monitoring service
 
 ---
 

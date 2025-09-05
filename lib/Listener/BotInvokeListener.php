@@ -100,7 +100,15 @@ class BotInvokeListener implements IEventListener {
 			}
 
 
-			// Check if this is an agenda item
+			// Check if this is a bulk agenda format first (has priority over single items)
+			$bulkAgendaData = $this->agendaService->parseBulkAgendaItems($message);
+			if ($bulkAgendaData) {
+				$result = $this->agendaService->addBulkAgendaItems($token, $bulkAgendaData, $data['actor'] ?? null, $lang);
+				$event->addAnswer($result['message'], true);
+				return;
+			}
+			
+			// Check if this is a single agenda item
 			$agendaData = $this->agendaService->parseAgendaItem($message);
 			if ($agendaData) {
 				$result = $this->agendaService->addAgendaItem($token, $agendaData, $data['actor'] ?? null, $lang);
