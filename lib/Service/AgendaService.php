@@ -22,6 +22,15 @@ use Psr\Log\LoggerInterface;
 class AgendaService {
 	// Updated pattern to capture flexible time formats
 	public const AGENDA_PATTERN = '/^(agenda|topic|item|insert|add)\s*:\s*(?:#?(\d+)\.?\s*)?(.+?)\s*(?:\(([^)]+)\))?$/mi';
+	
+	// Pattern to detect bulk agenda format
+	public const BULK_AGENDA_PATTERN = '/^agenda\s*:\s*\n([\s\S]+)$/mi';
+	
+	// Pattern for individual bullet points in bulk format
+	public const BULLET_ITEM_PATTERN = '/^\s*[-*]\s+(?:#?(\d+)\.?\s*)?(.+?)\s*(?:\(([^)]+)\))?$/m';
+	
+	// Maximum number of items allowed in bulk operation
+	public const MAX_BULK_ITEMS = 20;
 
 	public function __construct(
 		private LogEntryMapper $logEntryMapper,
@@ -50,6 +59,60 @@ class AgendaService {
 			];
 		}
 		return null;
+	}
+	
+	/**
+	 * Parse bulk agenda items from message
+	 * Format: agenda:\n- Item 1 (15m)\n- Item 2\n* Item 3 (30m)
+	 */
+	public function parseBulkAgendaItems(string $message): ?array {
+		// Check if this matches the bulk agenda pattern
+		if (!preg_match(self::BULK_AGENDA_PATTERN, $message, $matches)) {
+			return null;
+		}
+		
+		$bulkContent = $matches[1];
+		$lines = explode("\n", $bulkContent);
+		$items = [];
+		$lineNumber = 2; // Start at 2 because "agenda:" is line 1
+		
+		// Parse each line for bullet items
+		foreach ($lines as $line) {
+			$lineNumber++;
+			$trimmedLine = trim($line);
+			
+			// Skip empty lines
+			if (empty($trimmedLine)) {
+				continue;
+			}
+			
+			// Check if line matches bullet format
+			if (preg_match(self::BULLET_ITEM_PATTERN, $trimmedLine, $itemMatches)) {
+				$durationText = isset($itemMatches[3]) && $itemMatches[3] !== '' ? trim($itemMatches[3]) : '';
+				$durationMinutes = $this->parseDurationToMinutes($durationText);
+				
+				$items[] = [
+					'title' => trim($itemMatches[2]),
+					'duration' => $durationMinutes,
+					'position' => isset($itemMatches[1]) && $itemMatches[1] !== '' ? (int)$itemMatches[1] : null,
+					'line_number' => $lineNumber
+				];
+				
+				// Check for max items limit
+				if (count($items) > self::MAX_BULK_ITEMS) {
+					return [
+						'error' => 'max_items_exceeded',
+						'found_items' => count($items),
+						'max_items' => self::MAX_BULK_ITEMS
+					];
+				}
+			}
+		}
+		
+		return [
+			'items' => $items,
+			'total_items' => count($items)
+		];
 	}
 
 	/**
@@ -140,13 +203,132 @@ class AgendaService {
 
 		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
 		
-		return [
+	return [
 			'success' => true,
 			'message' => '📋 ' . $l->t('Added agenda item %d: %s (%s)', [
 				$position,
 				$title,
 				$this->formatDurationDisplay($duration, $lang)
 			]),
+		];
+	}
+	
+	/**
+	 * Add multiple agenda items in bulk (requires add permissions: types 1,2,3,6)
+	 */
+	public function addBulkAgendaItems(string $token, array $bulkData, ?array $actorData = null, string $lang = 'en'): array {
+		// Check add permissions if actor data is provided
+		if ($actorData !== null && !$this->permissionService->canAddAgendaItems($token, $actorData)) {
+			return [
+				'success' => false,
+				'message' => $this->permissionService->getAddAgendaDeniedMessage($lang)
+			];
+		}
+		
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
+		// Check for error conditions first
+		if (isset($bulkData['error'])) {
+			if ($bulkData['error'] === 'max_items_exceeded') {
+				return [
+					'success' => false,
+					'message' => '❌ ' . $l->t('Too many items: %d items found, maximum is %d', [
+						$bulkData['found_items'],
+						$bulkData['max_items']
+					])
+				];
+			}
+		}
+		
+		$items = $bulkData['items'] ?? [];
+		if (empty($items)) {
+			return [
+				'success' => false,
+				'message' => '❌ ' . $l->t('No valid agenda items found in bulk format')
+			];
+		}
+		
+		$addedItems = [];
+		$failedItems = [];
+		$startingPosition = $this->logEntryMapper->getNextAgendaPosition($token);
+		$currentPosition = $startingPosition;
+		
+		// Process each item
+		foreach ($items as $index => $itemData) {
+			try {
+				// Determine position - use explicit position if provided, otherwise sequential
+				$position = $itemData['position'] ?? $currentPosition;
+				
+				// Check for position conflicts and resolve
+				if ($this->logEntryMapper->isAgendaPositionOccupied($token, $position)) {
+					$position = $this->logEntryMapper->getNextAgendaPosition($token);
+				}
+				
+				// Create log entry
+				$logEntry = new LogEntry();
+				$logEntry->setServer('local');
+				$logEntry->setToken($token);
+				$logEntry->setType(LogEntry::TYPE_AGENDA_ITEM);
+				$logEntry->setDetails($itemData['title']);
+				$logEntry->setOrderPosition($position);
+				$logEntry->setDurationMinutes($itemData['duration']);
+				$logEntry->setConflictResolved(false);
+				$logEntry->setWarningSent(false);
+				$logEntry->setIsCompleted(false);
+				
+				$this->logEntryMapper->insert($logEntry);
+				
+				$addedItems[] = [
+					'position' => $position,
+					'title' => $itemData['title'],
+					'duration' => $itemData['duration'],
+					'duration_display' => $this->formatDurationDisplay($itemData['duration'], $lang)
+				];
+				
+				// Update current position for next item (if no explicit position)
+				if (!isset($itemData['position'])) {
+					$currentPosition = $position + 1;
+				}
+				
+			} catch (\Exception $e) {
+				$this->logger->error('Failed to add bulk agenda item', [
+					'token' => $token,
+					'item_index' => $index,
+					'item_title' => $itemData['title'] ?? 'unknown',
+					'error' => $e->getMessage()
+				]);
+				
+				$failedItems[] = [
+					'title' => $itemData['title'] ?? 'unknown',
+					'line_number' => $itemData['line_number'] ?? ($index + 1),
+					'error' => 'Database error'
+				];
+			}
+		}
+		
+		// Generate response message
+		if (empty($addedItems)) {
+			return [
+				'success' => false,
+				'message' => '❌ ' . $l->t('Failed to add any agenda items')
+			];
+		}
+		
+		$message = '📋 ' . $l->t('Added %d agenda items:', [count($addedItems)]) . "\n";
+		foreach ($addedItems as $item) {
+			$message .= sprintf("• %d. %s (%s)\n", $item['position'], $item['title'], $item['duration_display']);
+		}
+		
+		// Add warning for failed items if any
+		if (!empty($failedItems)) {
+			$message .= "\n⚠️ " . $l->t('Failed to add %d items', [count($failedItems)]);
+		}
+		
+		return [
+			'success' => true,
+			'message' => trim($message),
+			'added_count' => count($addedItems),
+			'failed_count' => count($failedItems)
 		];
 	}
 
