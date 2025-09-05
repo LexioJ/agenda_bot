@@ -71,6 +71,7 @@ class AgendaService {
 			return null;
 		}
 		
+<<<<<<< Updated upstream
 		$bulkContent = $matches[1];
 		$lines = explode("\n", $bulkContent);
 		$items = [];
@@ -93,10 +94,45 @@ class AgendaService {
 				
 				$items[] = [
 					'title' => trim($itemMatches[2]),
+=======
+		$bulletContent = trim($matches[1]);
+		if (empty($bulletContent)) {
+			return null;
+		}
+		
+		// Split into lines and parse each bullet point
+		$lines = explode("\n", $bulletContent);
+		$items = [];
+		$lineNumber = 0;
+		
+		foreach ($lines as $line) {
+			$lineNumber++;
+			$line = trim($line);
+			
+			// Skip empty lines
+			if (empty($line)) {
+				continue;
+			}
+			
+			// Check if line matches bullet pattern
+			if (preg_match(self::BULLET_ITEM_PATTERN, $line, $itemMatches)) {
+				$durationText = isset($itemMatches[3]) && $itemMatches[3] !== '' ? trim($itemMatches[3]) : '';
+				$durationMinutes = $this->parseDurationToMinutes($durationText);
+				$title = trim($itemMatches[2]);
+				
+				// Skip items with empty titles
+				if (empty($title)) {
+					continue;
+				}
+				
+				$items[] = [
+					'title' => $title,
+>>>>>>> Stashed changes
 					'duration' => $durationMinutes,
 					'position' => isset($itemMatches[1]) && $itemMatches[1] !== '' ? (int)$itemMatches[1] : null,
 					'line_number' => $lineNumber
 				];
+<<<<<<< Updated upstream
 				
 				// Check for max items limit
 				if (count($items) > self::MAX_BULK_ITEMS) {
@@ -107,6 +143,24 @@ class AgendaService {
 					];
 				}
 			}
+=======
+			}
+			// If line doesn't match bullet pattern, it's invalid - we'll report this in the response
+		}
+		
+		// Enforce maximum item limit
+		if (count($items) > self::MAX_BULK_ITEMS) {
+			return [
+				'items' => [],
+				'error' => 'max_items_exceeded',
+				'max_items' => self::MAX_BULK_ITEMS,
+				'found_items' => count($items)
+			];
+		}
+		
+		if (empty($items)) {
+			return null;
+>>>>>>> Stashed changes
 		}
 		
 		return [
@@ -896,6 +950,15 @@ class AgendaService {
 					 "• `agenda: Topic name (15 min)` - " . $l->t('Add agenda item with time') . "\n" .
 					 "• `topic: Meeting topic (1h)` - " . $l->t('Alternative syntax') . "\n" .
 					 "• `add: Another topic` - " . $l->t('Add item (10 min default)') . "\n" .
+					 "**" . $l->t('Bulk Agenda Creation:') . "**\n" .
+					 "``` \n" .
+					 "agenda:\n" .
+					 "- Item 1 (15m)\n" .
+					 "- Item 2 (30m)\n" .
+					 "- Item 3\n" .
+					 "```\n" .
+					 "*" . $l->t('Create multiple agenda items at once by using:') . "* `agenda:` + *" . $l->t('Multiple agenda items using bullet points') . "*\n" .
+					 "*" . $l->t('Maximum %d items per bulk operation', [self::MAX_BULK_ITEMS]) . "*\n" .
 					 "**" . $l->t('Time Formats:') . "** `(5 m)`, `(10 min)`, `(1h)`, `(2 hours)`, `(90 min)`\n\n";
 		}
 		
@@ -966,10 +1029,19 @@ class AgendaService {
 		}
 		
 		// Build update array
+		// Create a mapping from old position to new position
+		$positionMapping = [];
+		for ($i = 0; $i < count($positions); $i++) {
+			$oldPosition = $i + 1; // Positions are 1-based
+			$newPosition = array_search($oldPosition, $positions) + 1; // Find where old position appears in new order
+			$positionMapping[$oldPosition] = $newPosition;
+		}
+		
 		$updates = [];
-		foreach ($items as $index => $item) {
-			$newPosition = $positions[$index];
-			if ($item->getOrderPosition() !== $newPosition) {
+		foreach ($items as $item) {
+			$currentPosition = $item->getOrderPosition();
+			$newPosition = $positionMapping[$currentPosition];
+			if ($currentPosition !== $newPosition) {
 				$updates[$item->getId()] = $newPosition;
 			}
 		}
