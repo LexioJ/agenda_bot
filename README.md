@@ -4,7 +4,7 @@
 
 🌍 **Now with multi-language support!** Available in English and German, with more languages coming soon.
 
-⚡ **NEW in v1.2.0: Room-Level Time Monitoring!** Each Talk room can now have its own time monitoring settings, allowing different teams to customize warning thresholds and monitoring behavior while maintaining backward compatibility with global defaults. [Learn more →](ROOM_TIME_MONITORING.md)
+⚡ **NEW in v1.2.0: Room-Level Time Monitoring!** Each Talk room can now have its own time monitoring settings, allowing different teams to customize warning thresholds and monitoring behavior while maintaining backward compatibility with global defaults. [Learn more →](docs/ROOM_TIME_MONITORING.md)
 
 ## Overview
 
@@ -291,10 +291,10 @@ agenda_bot/
 ├── l10n/                         # 🌍 Translation files
 │   ├── en.json                  # English translations (100+ strings)
 │   └── de.json                  # German translations (100+ strings)
-├── docs/                         # Documentation & screenshots
+├── docs/                         # 📚 Project documentation
+│   ├── MULTILINGUAL_SUPPORT.md  # 🌍 Internationalization documentation
+│   └── ROOM_TIME_MONITORING.md  # ⚡ Room-level time monitoring guide
 ├── CHANGELOG.md                  # Version history & release notes
-├── MULTILINGUAL_SUPPORT.md       # 🌍 Internationalization documentation
-├── ROOM_TIME_MONITORING.md       # ⚡ Room-level time monitoring guide
 ├── LICENSE                       # AGPL-3.0-or-later
 └── README.md                     # This file
 ```
