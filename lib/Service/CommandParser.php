@@ -24,9 +24,13 @@ class CommandParser {
 	public const MOVE_PATTERN = '/^move\s*:\s*(\d+)\s+to\s+(\d+)$/i';
 	public const SWAP_PATTERN = '/^swap\s*:\s*(\d+),\s*(\d+)$/i';
 	public const REMOVE_PATTERN = '/^(remove|delete)\s*:\s*(\d+)$/i';
+	// Room-level time monitoring commands
 	public const TIME_CONFIG_PATTERN = '/^time\s+(config|status)$/i';
 	public const TIME_ENABLE_PATTERN = '/^time\s+(enable|disable)$/i';
-	public const TIME_THRESHOLDS_PATTERN = '/^time\s+thresholds\s+(\d+)\s+(\d+)\s+(\d+)$/i';
+	public const TIME_WARNING_PATTERN = '/^time\s+warning\s+(\d+)$/i';
+	public const TIME_OVERTIME_PATTERN = '/^time\s+overtime\s+(\d+)$/i';
+	public const TIME_THRESHOLDS_PATTERN = '/^time\s+thresholds\s+(\d+)\s+(\d+)$/i'; // Only 2 values now
+	public const TIME_RESET_PATTERN = '/^time\s+reset$/i';
 	public const CLEANUP_PATTERN = '/^(agenda\s+)?(cleanup|clean)$/i';
 
 	/**
@@ -147,14 +151,39 @@ class CommandParser {
 			];
 		}
 
-		// Time thresholds command
+		// Time warning threshold command
+		if (preg_match(self::TIME_WARNING_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'time_warning',
+				'token' => $token,
+				'threshold' => (int)$matches[1]
+			];
+		}
+
+		// Time overtime threshold command
+		if (preg_match(self::TIME_OVERTIME_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'time_overtime',
+				'token' => $token,
+				'threshold' => (int)$matches[1]
+			];
+		}
+
+		// Time thresholds command (both warning and overtime)
 		if (preg_match(self::TIME_THRESHOLDS_PATTERN, $message, $matches)) {
 			return [
 				'command' => 'time_thresholds',
 				'token' => $token,
-				'threshold_80' => (int)$matches[1],
-				'threshold_100' => (int)$matches[2],
-				'threshold_overtime' => (int)$matches[3]
+				'warning_threshold' => (int)$matches[1],
+				'overtime_threshold' => (int)$matches[2]
+			];
+		}
+
+		// Time reset command
+		if (preg_match(self::TIME_RESET_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'time_reset',
+				'token' => $token
 			];
 		}
 

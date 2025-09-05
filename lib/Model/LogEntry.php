@@ -46,6 +46,7 @@ class LogEntry extends Entity {
 	public const TYPE_AGENDA_TRANSITION = 'agenda_transition';
 	public const TYPE_AGENDA_WARNING = 'agenda_warning';
 	public const TYPE_AGENDA_STATUS = 'agenda_status';
+	public const TYPE_ROOM_CONFIG = 'room_config';
 	public const TYPE_TODO = 'todo';
 	public const TYPE_SOLVED = 'solved';
 	public const TYPE_NOTE = 'note';

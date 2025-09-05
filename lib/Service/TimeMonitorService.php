@@ -36,6 +36,7 @@ class TimeMonitorService {
 		private ChatManager $chatManager,
 		private Manager $talkManager,
 		private IFactory $l10nFactory,
+		private RoomConfigService $roomConfigService,
 	) {
 	}
 
@@ -101,10 +102,10 @@ class TimeMonitorService {
 			return; // No planned duration
 		}
 
-		$progressRatio = $elapsedMinutes / $plannedMinutes;
-		$config = $this->getTimeMonitoringConfig();
-		
-		$this->logger->debug(sprintf("TimeMonitor: Checking item %d '%s' - %.1f/%d min (%.2f ratio), thresholds: 80%%=%s, 100%%=%s, overtime=%s", $itemId, $title, $elapsedMinutes, $plannedMinutes, $progressRatio, $config['warning_threshold_80'], $config['warning_threshold_100'], $config['overtime_threshold']));
+	$progressRatio = $elapsedMinutes / $plannedMinutes;
+	$config = $this->getTimeMonitoringConfig($token);
+	
+	$this->logger->debug(sprintf("TimeMonitor: Checking item %d '%s' - %.1f/%d min (%.2f ratio), thresholds: warning=%.0f%%, 100%%=100%%, overtime=%.0f%%", $itemId, $title, $elapsedMinutes, $plannedMinutes, $progressRatio, ($config['warning_threshold'] ?? self::DEFAULT_WARNING_THRESHOLD_80) * 100, ($config['overtime_threshold'] ?? self::DEFAULT_OVERTIME_THRESHOLD) * 100));
 		
 		$warningType = $this->determineWarningType($progressRatio, $item);
 		
@@ -118,26 +119,61 @@ class TimeMonitorService {
 
 	/**
 	 * Determine if a warning should be sent based on progress ratio
+	 * Ensures warnings are sent in proper sequence: approaching → overtime → overtime_critical
+	 * Never sends lower-level warnings after higher-level ones have been sent
 	 */
 	private function determineWarningType(float $progressRatio, LogEntry $item): ?string {
-		$config = $this->getTimeMonitoringConfig();
+		$config = $this->getTimeMonitoringConfig($item->getToken());
 		
 		if (!$config['enabled']) {
 			return null;
 		}
 		
-		// Get configurable thresholds
-		$overtimeThreshold = $config['overtime_threshold'];
-		$warningThreshold100 = $config['warning_threshold_100'];
-		$warningThreshold80 = $config['warning_threshold_80'];
+		// Get thresholds - simplified schema
+		$warningThreshold = $config['warning_threshold'] ?? self::DEFAULT_WARNING_THRESHOLD_80;
+		$timeReachedThreshold = 1.0; // Always 100% - fixed
+		$overtimeThreshold = $config['overtime_threshold'] ?? self::DEFAULT_OVERTIME_THRESHOLD;
 		
-		// Check each warning level in order of severity, ensuring we only send each warning once
-		if ($progressRatio >= $overtimeThreshold && !$this->hasWarningBeenSent($item, 'overtime_critical')) {
-			return 'overtime_critical'; // Configurable % over time
-		} elseif ($progressRatio >= $warningThreshold100 && !$this->hasWarningBeenSent($item, 'overtime')) {
-			return 'overtime'; // Exactly at or past planned time
-		} elseif ($progressRatio >= $warningThreshold80 && !$this->hasWarningBeenSent($item, 'approaching')) {
-			return 'approaching'; // 80% of planned time reached
+		// Check what warnings have already been sent to ensure proper progression
+		$approachingSent = $this->hasWarningBeenSent($item, 'approaching');
+		$overtimeSent = $this->hasWarningBeenSent($item, 'overtime');
+		$overtimeCriticalSent = $this->hasWarningBeenSent($item, 'overtime_critical');
+		
+		$this->logger->debug(sprintf(
+			"TimeMonitor: Item %d warnings status - approaching:%s, overtime:%s, critical:%s",
+			$item->getId(),
+			$approachingSent ? 'sent' : 'not-sent',
+			$overtimeSent ? 'sent' : 'not-sent',
+			$overtimeCriticalSent ? 'sent' : 'not-sent'
+		));
+		
+		// Determine the next appropriate warning based on progression and current ratio
+		if ($progressRatio >= $overtimeThreshold) {
+			// We're in overtime critical zone - send only if not already sent
+			if (!$overtimeCriticalSent) {
+				$this->logger->debug(sprintf("TimeMonitor: Item %d triggering overtime_critical warning", $item->getId()));
+				return 'overtime_critical';
+			} else {
+				$this->logger->debug(sprintf("TimeMonitor: Item %d overtime_critical already sent, skipping", $item->getId()));
+			}
+		} elseif ($progressRatio >= $timeReachedThreshold) {
+			// We're at/past planned time (100%) - send only if not already sent AND overtime_critical hasn't been sent
+			if (!$overtimeSent && !$overtimeCriticalSent) {
+				$this->logger->debug(sprintf("TimeMonitor: Item %d triggering overtime warning", $item->getId()));
+				return 'overtime';
+			} else {
+				$this->logger->debug(sprintf("TimeMonitor: Item %d overtime blocked (overtime:%s, critical:%s)", 
+					$item->getId(), $overtimeSent ? 'sent' : 'not-sent', $overtimeCriticalSent ? 'sent' : 'not-sent'));
+			}
+		} elseif ($progressRatio >= $warningThreshold) {
+			// We're approaching limit (configurable %) - send only if no higher warnings have been sent
+			if (!$approachingSent && !$overtimeSent && !$overtimeCriticalSent) {
+				$this->logger->debug(sprintf("TimeMonitor: Item %d triggering approaching warning", $item->getId()));
+				return 'approaching';
+			} else {
+				$this->logger->debug(sprintf("TimeMonitor: Item %d approaching blocked (approaching:%s, overtime:%s, critical:%s)", 
+					$item->getId(), $approachingSent ? 'sent' : 'not-sent', $overtimeSent ? 'sent' : 'not-sent', $overtimeCriticalSent ? 'sent' : 'not-sent'));
+			}
 		}
 		
 		return null;
@@ -166,9 +202,8 @@ class TimeMonitorService {
 				return;
 			}
 
-			// Use default language 'en' for time warnings
-			// TODO: Implement proper room language detection when available
-			$lang = 'en';
+			// Get room language for proper localization
+			$lang = $this->roomConfigService->getRoomLanguage($token);
 			
 			// Generate warning message based on type with room language
 			$message = $this->generateWarningMessage($warningType, $item, $elapsedMinutes, $plannedMinutes, $lang);
@@ -206,7 +241,7 @@ class TimeMonitorService {
 		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
 		$title = $item->getDetails();
 		$elapsedInt = (int)ceil($elapsedMinutes);
-		$config = $this->getTimeMonitoringConfig();
+		$config = $this->getTimeMonitoringConfig($item->getToken());
 		
 		switch ($warningType) {
 			case 'approaching':
@@ -282,15 +317,20 @@ class TimeMonitorService {
 	}
 
 	/**
-	 * Get time monitoring configuration
+	 * Get time monitoring configuration (room-aware)
 	 */
-	public function getTimeMonitoringConfig(): array {
+	public function getTimeMonitoringConfig(?string $token = null): array {
+		if ($token !== null) {
+			return $this->roomConfigService->getRoomTimeMonitoringConfig($token);
+		}
+		
+		// Fallback to global config when no token provided (backward compatibility)
 		return [
 			'enabled' => $this->config->getAppValue('agenda_bot', 'time-monitoring-enabled', 'true') === 'true',
-			'warning_threshold_80' => (float)$this->config->getAppValue('agenda_bot', 'warning-threshold-80', (string)self::DEFAULT_WARNING_THRESHOLD_80),
-			'warning_threshold_100' => (float)$this->config->getAppValue('agenda_bot', 'warning-threshold-100', (string)self::DEFAULT_WARNING_THRESHOLD_100),
+			'warning_threshold' => (float)$this->config->getAppValue('agenda_bot', 'warning-threshold', (string)self::DEFAULT_WARNING_THRESHOLD_80),
 			'overtime_threshold' => (float)$this->config->getAppValue('agenda_bot', 'overtime-warning-threshold', (string)self::DEFAULT_OVERTIME_THRESHOLD),
-			'check_interval' => (int)$this->config->getAppValue('agenda_bot', 'monitor-check-interval', '120'),
+			'check_interval' => (int)$this->config->getAppValue('agenda_bot', 'monitor-check-interval', '300'),
+			'source' => 'global',
 		];
 	}
 }

@@ -60,7 +60,7 @@ Tired of unproductive meetings that run overtime? The Agenda Bot transforms chao
 
 Start having better meetings - Add the Agenda Bot to your Talk rooms and experience the difference!]]></description>
 
-	<version>1.1.3</version>
+	<version>1.2.0</version>
 	<licence>agpl</licence>
 
 	<author>Agenda Bot Team</author>
@@ -78,6 +78,31 @@ Start having better meetings - Add the Agenda Bot to your Talk rooms and experie
 	<website>https://github.com/lexioj/agenda_bot</website>
 	<bugs>https://github.com/lexioj/agenda_bot/issues</bugs>
 	<repository>https://github.com/lexioj/agenda_bot.git</repository>
+
+	<changelog><![CDATA[## 1.2.0 - Room-Level Time Monitoring
+
+### 🆕 New Features
+- **Room-specific time monitoring**: Each Talk room can now configure its own time monitoring settings
+- **New bot commands**: `time config`, `time enable/disable`, `time warning X`, `time overtime X`, `time thresholds X Y`, `time reset`
+- **Emoji reaction support**: Clean up completed agenda items using emoji reactions (👍, ✅, 🧹)
+- **Global fallback system**: Rooms without specific configuration use global defaults
+
+### 🔧 Enhancements
+- Enhanced permission system for room-level time commands
+- Improved meeting state management - current items cleared when calls end
+- Multi-language reaction support with proper localization
+- Background job filtering based on individual room settings
+
+### 🛠️ Bug Fixes
+- Fixed reaction permission handling for bot actors
+- Fixed language localization in reaction events
+- Corrected bot registration to include reaction handling capabilities
+- Improved call end behavior with proper agenda item deactivation
+
+### 📚 Documentation
+- Added ROOM_TIME_MONITORING.md guide
+- Updated README.md with room-level commands and emoji reactions
+- Enhanced help system with new command reference]]></changelog>
 
 	<dependencies>
 		<nextcloud min-version="31" max-version="32" />

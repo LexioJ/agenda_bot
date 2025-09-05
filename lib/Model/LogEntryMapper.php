@@ -190,6 +190,25 @@ class LogEntryMapper extends QBMapper {
 	}
 
 	/**
+	 * Find room configuration entry
+	 */
+	public function findRoomConfig(string $token): ?LogEntry {
+		$query = $this->db->getQueryBuilder();
+		$query->select('*')
+			->from($this->getTableName())
+			->where($query->expr()->eq('server', $query->createNamedParameter('local')))
+			->andWhere($query->expr()->eq('token', $query->createNamedParameter($token)))
+			->andWhere($query->expr()->eq('type', $query->createNamedParameter(LogEntry::TYPE_ROOM_CONFIG)))
+			->setMaxResults(1);
+
+		try {
+			return $this->findEntity($query);
+		} catch (\Exception $e) {
+			return null;
+		}
+	}
+
+	/**
 	 * Find completed agenda items
 	 */
 	public function findCompletedAgendaItems(string $token): array {
