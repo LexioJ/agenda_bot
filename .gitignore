@@ -20,6 +20,7 @@ Thumbs.db
 
 # Nextcloud specific
 /vendor-bin/
+.nextcloud/
 
 # Logs
 *.log
@@ -47,6 +48,3 @@ WARP.md
 run_tests.sh
 test_*.sh
 tests
-
-# Planning documents (development only)
-ROOM_TIME_CONFIG_PLAN.md
