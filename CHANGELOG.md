@@ -2,9 +2,47 @@
 
 All notable changes to the Agenda Bot project will be documented in this file.
 
+## [1.3.0] - 2025-09-05
+
+### 🚀 Added - Bulk Agenda Import
+- **Bulk agenda creation**: Create multiple agenda items with a single message using structured list format
+- **Flexible bullet format**: Support for both `-` and `*` bullet point markers in bulk import
+- **Copy-paste workflow**: Perfect for importing agendas from calendar invitations, meeting templates, or external tools
+- **Safety limits**: Maximum 20 items per bulk operation to prevent abuse
+- **Error resilience**: Graceful handling of invalid items while processing valid ones
+- **Batch confirmation**: Clear summary of all successfully added items with positions and durations
+
+### 🔧 Enhanced - Core Services
+- **AgendaService**: New `parseBulkAgendaItems()` and `addBulkAgendaItems()` methods with atomic transaction support
+- **BotInvokeListener**: Enhanced message processing with bulk format detection (takes priority over single items)
+- **Permission system**: Bulk operations respect existing permission model (moderators, owners, regular users)
+- **Position management**: Intelligent sequential positioning with conflict resolution
+- **Time parsing**: Full compatibility with existing time formats `(5 min)`, `(1h)`, `(30m)`, etc.
+
+### 💬 Enhanced - User Experience
+- **Help system**: Updated `agenda help` command with bulk format examples and usage instructions
+- **Localization**: Complete translation support in English and German for all bulk operation messages
+- **Error feedback**: Clear error messages for invalid formats, exceeded limits, or processing failures
+- **Progress tracking**: Detailed confirmation showing exactly what was created
+
+### 🎯 Usage Examples
+```
+agenda:
+- Welcome & introductions (5 min)
+- Project status review (20 min)
+- Budget discussion (15 min)
+- Next steps planning (10 min)
+- Closing remarks
+```
+
+### 📚 Documentation
+- **README.md**: New "Bulk Agenda Creation" section with examples and feature overview
+- **Help integration**: Bulk format examples embedded in bot help system
+- **Key features**: Updated feature list to highlight bulk import capability
+
 ## [1.2.0] - 2025-09-05
 
-### 🆕 Added - Room-Level Time Monitoring
+### ⏰ Added - Room-Level Time Monitoring
 - **Room-specific time monitoring configuration**: Each Talk room can now have its own time monitoring settings
 - **New bot commands**: `time config`, `time enable/disable`, `time warning X`, `time overtime X`, `time thresholds X Y`, `time reset`
 - **Global fallback system**: Rooms without specific configuration automatically use global defaults
@@ -15,7 +53,7 @@ All notable changes to the Agenda Bot project will be documented in this file.
 - **Comprehensive unit tests**: Full test coverage for room-level configuration features
 - **Backward compatibility**: Existing deployments continue working without changes
 
-### 🆕 Added - Emoji Reaction Support
+### 👍 Added - Emoji Reaction Support
 - **Agenda cleanup via emoji reactions**: Users can now clean up completed agenda items using emoji reactions (👍, ✅, 🧹)
 - **Enhanced bot registration**: Bots now register with EVENT (4) and REACTION (8) features enabled (bitwise OR 12)
 - **Reaction event handling**: Added comprehensive reaction event processing in BotInvokeListener

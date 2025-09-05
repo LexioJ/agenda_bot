@@ -17,6 +17,7 @@ Tired of unproductive meetings that run overtime? The Agenda Bot transforms chao
 #### 🎯 Effortless Agenda Creation
 - Natural language: `agenda: Project review (15 min)` 
 - Multiple formats: `topic:`, `item:`, `add:`, `insert:`
+- Create multiple items at once from structured lists
 - Smart time parsing: `(5 min)`, `(1h)`, `(90 min)`, `(2 hours)`
 - Automatic positioning or manual `#2.` syntax
 
@@ -60,7 +61,7 @@ Tired of unproductive meetings that run overtime? The Agenda Bot transforms chao
 
 Start having better meetings - Add the Agenda Bot to your Talk rooms and experience the difference!]]></description>
 
-	<version>1.2.0</version>
+	<version>1.3.0</version>
 	<licence>agpl</licence>
 
 	<author>Agenda Bot Team</author>
@@ -79,30 +80,34 @@ Start having better meetings - Add the Agenda Bot to your Talk rooms and experie
 	<bugs>https://github.com/lexioj/agenda_bot/issues</bugs>
 	<repository>https://github.com/lexioj/agenda_bot.git</repository>
 
-	<changelog><![CDATA[## 1.2.0 - Room-Level Time Monitoring
+	<changelog><![CDATA[## 1.3.0 - Bulk Agenda Import
 
-### 🆕 New Features
-- **Room-specific time monitoring**: Each Talk room can now configure its own time monitoring settings
-- **New bot commands**: `time config`, `time enable/disable`, `time warning X`, `time overtime X`, `time thresholds X Y`, `time reset`
-- **Emoji reaction support**: Clean up completed agenda items using emoji reactions (👍, ✅, 🧹)
-- **Global fallback system**: Rooms without specific configuration use global defaults
+### 🚀 New Features
+- **Bulk agenda creation**: Create multiple agenda items with a single message using structured list format
+- **Copy-paste workflow**: Perfect for importing agendas from calendar invitations, meeting templates, or external tools
+- **Flexible bullet format**: Support for both `-` and `*` bullet point markers in bulk import
+- **Safety limits**: Maximum 20 items per bulk operation to prevent abuse
+- **Error resilience**: Graceful handling of invalid items while processing valid ones
 
 ### 🔧 Enhancements
-- Enhanced permission system for room-level time commands
-- Improved meeting state management - current items cleared when calls end
-- Multi-language reaction support with proper localization
-- Background job filtering based on individual room settings
+- Enhanced message processing with bulk format detection (takes priority over single items)
+- Intelligent sequential positioning with conflict resolution
+- Complete translation support in English and German for all bulk operation messages
+- Updated help system with bulk format examples and usage instructions
 
-### 🛠️ Bug Fixes
-- Fixed reaction permission handling for bot actors
-- Fixed language localization in reaction events
-- Corrected bot registration to include reaction handling capabilities
-- Improved call end behavior with proper agenda item deactivation
+### 🎯 Usage Example
+```
+agenda:
+- Welcome & introductions (5 min)
+- Project status review (20 min)
+- Budget discussion (15 min)
+- Next steps planning (10 min)
+- Closing remarks
+```
 
 ### 📚 Documentation
-- Added ROOM_TIME_MONITORING.md guide
-- Updated README.md with room-level commands and emoji reactions
-- Enhanced help system with new command reference]]></changelog>
+- Updated README.md with "Bulk Agenda Creation" section
+- Enhanced help integration with bulk format examples]]></changelog>
 
 	<dependencies>
 		<nextcloud min-version="31" max-version="32" />
