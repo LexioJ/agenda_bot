@@ -13,6 +13,9 @@
 
 The Agenda Bot is a comprehensive Nextcloud app that transforms how teams manage meeting agendas. Beyond basic agenda management, it provides intelligent time monitoring, permission-based access control, and automated progress tracking to ensure productive and efficient meetings.
 
+## Screenshots
+![Agenda Bot Meeting Flow](https://github.com/LexioJ/agenda_bot/blob/main/docs/agenda_bot_meeting_flow.png)
+
 ## Key Features
 
 ### 📋 **Advanced Agenda Management**
