@@ -66,7 +66,7 @@ class BotService {
 			$secret . str_replace('_', '', $lang),
 			'nextcloudapp://' . Application::APP_ID . '/' . $lang,
 			$l->t('Agenda bot') . ' (' . $langName . ') - ' . $l->t('Specialized bot for managing meeting agendas and tracking agenda items during Talk calls'),
-			features: 4, // EVENT
+			features: 4 | 8, // EVENT | REACTION
 		);
 		try {
 			$this->dispatcher->dispatchTyped($event);

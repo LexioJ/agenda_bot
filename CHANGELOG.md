@@ -2,6 +2,50 @@
 
 All notable changes to the Agenda Bot project will be documented in this file.
 
+## [1.2.0] - 2025-09-05
+
+### 🆕 Added - Room-Level Time Monitoring
+- **Room-specific time monitoring configuration**: Each Talk room can now have its own time monitoring settings
+- **New bot commands**: `time config`, `time enable/disable`, `time warning X`, `time overtime X`, `time thresholds X Y`, `time reset`
+- **Global fallback system**: Rooms without specific configuration automatically use global defaults
+- **RoomConfigService**: New service for managing room-specific configuration storage
+- **Enhanced AgendaService**: Added room-aware time monitoring methods with permission checks
+- **Updated TimeMonitorService**: Now uses room-specific settings with intelligent fallback logic
+- **Database migration**: Creates `oc_ab_room_config` table for storing room configurations
+- **Comprehensive unit tests**: Full test coverage for room-level configuration features
+- **Backward compatibility**: Existing deployments continue working without changes
+
+### 🆕 Added - Emoji Reaction Support
+- **Agenda cleanup via emoji reactions**: Users can now clean up completed agenda items using emoji reactions (👍, ✅, 🧹)
+- **Enhanced bot registration**: Bots now register with EVENT (4) and REACTION (8) features enabled (bitwise OR 12)
+- **Reaction event handling**: Added comprehensive reaction event processing in BotInvokeListener
+- **Permission-based reactions**: Only moderators and owners can use emoji reactions for agenda cleanup
+- **Multi-language reaction support**: Reaction processing includes proper language detection and localized responses
+- **Fallback reaction detection**: Smart detection of agenda summary messages for reaction processing
+
+### 🔧 Enhanced - Core Features
+- **BotInvokeListener**: Extended to handle new room-level time monitoring commands and reaction events
+- **CommandParser**: Added regex patterns for parsing room-level time commands
+- **Background job filtering**: `AgendaTimeMonitorJob` now filters rooms based on individual monitoring settings
+- **Permission system**: All room-level time commands require moderator/owner permissions
+- **Localization**: Added German and English translations for all new features
+- **Meeting state management**: Current agenda items are now properly cleared when calls end
+- **Updated cleanup instructions**: Agenda summaries now show both text command and emoji reaction options
+
+### 🛠️ Fixed - Critical Bugs
+- **Reaction permission handling**: Fixed permission checks failing due to bot actor in reaction events
+- **Language localization in reactions**: Fixed English error messages appearing in German rooms during reactions
+- **Call end behavior**: Current agenda items are now properly deactivated when meetings end
+- **Bot feature registration**: Corrected bot registration to include reaction handling capabilities
+- **Event actor detection**: Improved handling of reaction events where actor data contains bot info instead of reacting user
+
+### 📚 Documentation
+- **ROOM_TIME_MONITORING.md**: Comprehensive guide to room-level time monitoring features
+- **Updated README.md**: Added room-level time monitoring command reference and emoji reaction documentation
+- **Enhanced help system**: Bot help now includes room-level time monitoring commands
+- **Migration guide**: Instructions for gradual adoption of room-specific settings
+- **Updated localization files**: Enhanced cleanup instructions to mention emoji reactions
+
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 

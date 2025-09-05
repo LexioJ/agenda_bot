@@ -15,6 +15,7 @@ use OCA\AgendaBot\Model\LogEntryMapper;
 use OCA\Talk\Manager;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\IConfig;
+use OCP\IUserManager;
 use OCP\L10N\IFactory;
 use Psr\Log\LoggerInterface;
 
@@ -27,8 +28,10 @@ class AgendaService {
 		private ITimeFactory $timeFactory,
 		private IConfig $config,
 		private PermissionService $permissionService,
+		private RoomConfigService $roomConfigService,
 		private LoggerInterface $logger,
 		private IFactory $l10nFactory,
+		private IUserManager $userManager,
 	) {
 	}
 
@@ -189,12 +192,12 @@ class AgendaService {
 			
 			// Check if this is the current item
 			if ($currentItem && $currentItem->getOrderPosition() === $item['position']) {
-				$prefix = $l->t('Current Item') . ' ';
 				$timeSpent = $this->getTimeSpentOnItem($currentItem);
 				$timeSpentDisplay = $this->formatDurationDisplay($timeSpent, $lang);
 				$plannedDisplay = $this->formatDurationDisplay($item['duration'], $lang);
-				$timeInfo = " *(" . $l->t('%s/%s', [$timeSpentDisplay, $plannedDisplay]) . ")*";
-				$title = "`{$item['title']}`";
+				$timeInfo = " *({$timeSpentDisplay}/{$plannedDisplay})*";
+				$prefix = "`🗣️ {$item['position']} {$item['title']}`";
+				$title = '';
 			} elseif ($item['completed']) {
 				$icon = $l->t('Completed') . ' ';
 				$actualDuration = 0;
@@ -211,7 +214,12 @@ class AgendaService {
 				$title = $item['title'];
 			}
 			
-			$status .= "{$prefix}{$icon}{$item['position']}. {$title}{$timeInfo}\n";
+			// For current item, prefix already contains the full formatted string
+			if ($currentItem && $currentItem->getOrderPosition() === $item['position']) {
+				$status .= "{$prefix}{$timeInfo}\n";
+			} else {
+				$status .= "{$prefix}{$icon}{$item['position']}. {$title}{$timeInfo}\n";
+			}
 		}
 
 		return $status;
@@ -254,13 +262,14 @@ class AgendaService {
 		$item->setStartTime($this->timeFactory->now()->getTimestamp());
 		$this->logEntryMapper->update($item);
 
-	return '🗣️ ' . $l->t('Set agenda item %d as current: "%s"', [$position, $item->getDetails()]);
+	$plannedDisplay = $this->formatDurationDisplay($item->getDurationMinutes(), $lang);
+	return '🗣️ ' . $l->t('Set agenda item %d as current:', [$position]) . "\n`" . $item->getDetails() . "`\n*" . $l->t('Planned duration: %s', [$plannedDisplay]) . "*";
 	}
 
 	/**
-	 * Clear all current agenda items for a conversation
+	 * Clear all current agenda items for a conversation (when call ends)
 	 */
-	private function clearCurrentAgendaItems(string $token): void {
+	public function clearAllCurrentItems(string $token): void {
 		$items = $this->logEntryMapper->findAgendaItems($token);
 		foreach ($items as $item) {
 			if ($item->getStartTime() !== null && !$item->getIsCompleted()) {
@@ -268,6 +277,13 @@ class AgendaService {
 				$this->logEntryMapper->update($item);
 			}
 		}
+	}
+
+	/**
+	 * Clear all current agenda items for a conversation (private helper)
+	 */
+	private function clearCurrentAgendaItems(string $token): void {
+		$this->clearAllCurrentItems($token);
 	}
 
 	/**
@@ -477,20 +493,25 @@ class AgendaService {
 	}
 
 	/**
-	 * Get time monitoring configuration
+	 * Get time monitoring configuration (room-aware)
 	 */
-	public function getTimeMonitoringConfig(): array {
+	public function getTimeMonitoringConfig(string $token = null): array {
+		if ($token !== null) {
+			return $this->roomConfigService->getRoomTimeMonitoringConfig($token);
+		}
+		
+		// Fallback to global config when no token provided (backward compatibility)
 		return [
 			'enabled' => $this->config->getAppValue('agenda_bot', 'time-monitoring-enabled', 'true') === 'true',
-			'warning_threshold_80' => (float)$this->config->getAppValue('agenda_bot', 'warning-threshold-80', '0.8'),
-			'warning_threshold_100' => (float)$this->config->getAppValue('agenda_bot', 'warning-threshold-100', '1.0'),
+			'warning_threshold' => (float)$this->config->getAppValue('agenda_bot', 'warning-threshold', '0.8'),
 			'overtime_threshold' => (float)$this->config->getAppValue('agenda_bot', 'overtime-warning-threshold', '1.2'),
-			'check_interval' => (int)$this->config->getAppValue('agenda_bot', 'monitor-check-interval', '120'),
+			'check_interval' => RoomConfigService::FIXED_CHECK_INTERVAL,
+			'source' => 'global',
 		];
 	}
 
 	/**
-	 * Set time monitoring configuration (requires moderator permissions)
+	 * Set time monitoring configuration (requires moderator permissions) - now room-aware
 	 */
 	public function setTimeMonitoringConfig(array $config, string $token, ?array $actorData = null, string $lang = 'en'): array {
 		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
@@ -506,75 +527,150 @@ class AgendaService {
 		$result = ['success' => true, 'message' => ''];
 		$changes = [];
 		
+		// Get user ID from actor data for audit trail
+		$userId = 'unknown';
+		if ($actorData !== null && is_array($actorData)) {
+			// Try different possible keys for user identification
+			$rawUserId = $actorData['id'] ?? $actorData['actorId'] ?? $actorData['name'] ?? 'unknown';
+			
+			// Clean up user ID by removing prefixes like 'users/' or 'guests/'
+			if ($rawUserId !== 'unknown' && is_string($rawUserId)) {
+				$userId = $this->cleanUserId($rawUserId);
+			}
+		}
+		
+		// Prepare room configuration
+		$roomConfig = [];
+		
 		if (isset($config['enabled'])) {
-			$this->config->setAppValue('agenda_bot', 'time-monitoring-enabled', $config['enabled'] ? 'true' : 'false');
+			$roomConfig['enabled'] = (bool)$config['enabled'];
 			$changes[] = $l->t('enabled status', [$config['enabled'] ? $l->t('enabled') : $l->t('disabled')]);
 		}
 		
-		if (isset($config['warning_threshold_80'])) {
-			$threshold = max(0.1, min(1.0, (float)$config['warning_threshold_80']));
-			$this->config->setAppValue('agenda_bot', 'warning-threshold-80', (string)$threshold);
-			$changes[] = $l->t('80%% warning at %d%%', [round($threshold * 100)]);
-		}
-		
-		if (isset($config['warning_threshold_100'])) {
-			$threshold = max(0.5, min(2.0, (float)$config['warning_threshold_100']));
-			$this->config->setAppValue('agenda_bot', 'warning-threshold-100', (string)$threshold);
-			$changes[] = $l->t('100%% warning at %d%%', [round($threshold * 100)]);
+		if (isset($config['warning_threshold'])) {
+			$threshold = max(0.1, min(0.95, (float)$config['warning_threshold']));
+			$roomConfig['warning_threshold'] = $threshold;
+			$changes[] = $l->t('Time limit warning at %d%%', [round($threshold * 100)]);
 		}
 		
 		if (isset($config['overtime_threshold'])) {
-			$threshold = max(1.0, min(3.0, (float)$config['overtime_threshold']));
-			$this->config->setAppValue('agenda_bot', 'overtime-warning-threshold', (string)$threshold);
+			$threshold = max(1.05, min(3.0, (float)$config['overtime_threshold']));
+			$roomConfig['overtime_threshold'] = $threshold;
 			$changes[] = $l->t('Overtime warning at %d%%', [round($threshold * 100)]);
-		}
-		
-		if (isset($config['check_interval'])) {
-			$intervalSeconds = max(30, min(600, (int)$config['check_interval']));
-			$this->config->setAppValue('agenda_bot', 'monitor-check-interval', (string)$intervalSeconds);
-			$minutes = (int) round($intervalSeconds / 60);
-			$changes[] = $l->t('check interval status', [$minutes]);
 		}
 		
 		if (empty($changes)) {
 			$result['success'] = false;
 			$result['message'] = '❌ ' . $l->t('No valid configuration changes provided');
 		} else {
-			$result['message'] = '✅ ' . $l->t('Updated time monitoring: %s', [implode(', ', $changes)]);
+			// Save room-level configuration
+			$this->roomConfigService->setRoomTimeMonitoringConfig($token, $roomConfig, $userId);
+			$result['message'] = '✅ ' . $l->t('Updated room time monitoring: %s', [implode(', ', $changes)]);
 		}
 		
 		return $result;
 	}
 
 	/**
-	 * Get formatted time monitoring status
+	 * Get formatted time monitoring status (room-aware)
 	 */
-	public function getTimeMonitoringStatus(string $lang = 'en'): string {
+	public function getTimeMonitoringStatus(string $token, string $lang = 'en'): string {
 		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
-		$config = $this->getTimeMonitoringConfig();
+		$config = $this->getTimeMonitoringConfig($token);
+		$metadata = $this->roomConfigService->getRoomConfigMetadata($token);
 		
-		$status = "### ⏰ **" . $l->t('Time Monitoring Configuration') . ":**\n\n";
+		$configType = $config['source'] ?? 'room';
+		$title = $configType === 'room' ? 'Room Time Monitoring' : 'Time Monitoring (Global Default)';
+		
+		$status = "### ⏰ **" . $l->t($title) . ":**\n\n";
 		
 		if (!$config['enabled']) {
 			$status .= "❌ **" . $l->t("Disabled") . "** - " . $l->t("No time warnings will be sent") . "\n\n";
 		} else {
 			$status .= "✅ **" . $l->t("Enabled") . "** - " . $l->t("Active monitoring with the following thresholds") . ":\n\n";
-			$status .= "• **" . $l->t("First Warning") . "**: " . 
-				$l->t("%.0f%% of planned time", [$config['warning_threshold_80'] * 100]) . "\n";
 			$status .= "• **" . $l->t("Time Limit Warning") . "**: " . 
-				$l->t("%.0f%% of planned time", [$config['warning_threshold_100'] * 100]) . "\n";
+				$l->t("%.0f%% of planned time", [$config['warning_threshold'] * 100]) . "\n";
+			$status .= "• **" . $l->t("Time Limit Reached") . "**: " . 
+				$l->t("%.0f%% of planned time", [100]) . " (" . $l->t("fixed") . ")\n";
 			$status .= "• **" . $l->t("Overtime Alert") . "**: " . 
 				$l->t("%.0f%% of planned time", [$config['overtime_threshold'] * 100]) . "\n";
 			$minutes = (int) round($config['check_interval'] / 60);
 			$status .= "• **" . $l->t("Check Interval") . "**: " . $l->t("%d minutes (%s)", [$minutes, $l->t("fixed")]) . "\n\n";
 		}
 		
+		// Add configuration metadata for room configs
+		if ($configType === 'room' && $metadata) {
+			$configuredAt = $metadata['configured_at'] ? date('M j, Y', $metadata['configured_at']) : 'unknown';
+			$configuredByUserId = $metadata['configured_by'] ?? 'unknown';
+			$configuredByDisplay = $this->formatUserForDisplay($configuredByUserId);
+			$status .= "📝 *" . $l->t('Configured by: %s on %s', [$configuredByDisplay, $configuredAt]) . "*\n\n";
+		}
+		
 		$status .= "**" . $l->t("Configuration Commands") . ":**\n";
-		$status .= "• `time config` - " . $l->t("Show time monitoring configuration") . "\n";
-		$status .= "• `time enable` / `time disable` - " . $l->t("Enable/disable monitoring") . "\n";
-		$status .= "• `time thresholds 75 100 125` - " . $l->t("Set warning thresholds") . " (" . $l->t("percentages") . ")\n";
+		$status .= "• `time config` - " . $l->t("Show room time monitoring configuration") . "\n";
+		$status .= "• `time enable` / `time disable` - " . $l->t("Enable/disable monitoring for this room") . "\n";
+		$status .= "• `time warning 85` - " . $l->t("Set time limit warning threshold") . " (" . $l->t("percentages") . ")\n";
+		$status .= "• `time overtime 110` - " . $l->t("Set overtime alert threshold") . " (" . $l->t("percentages") . ")\n";
+		$status .= "• `time thresholds 75 120` - " . $l->t("Set both warning and overtime thresholds") . "\n";
+		$status .= "• `time reset` - " . $l->t("Reset to global defaults") . "\n\n";
+		
+		if ($configType === 'global') {
+			$status .= "💡 *" . $l->t('This room is using global defaults. Use time commands to set room-specific configuration.') . "*\n";
+		}
+		
+		$status .= "ℹ️ *" . $l->t('Time checks run every 5 minutes with background jobs') . "*\n";
+		$status .= "🔒 *" . $l->t('Moderators/Owners can configure room-specific time monitoring') . "*\n";
 		
 		return $status;
+	}
+
+	/**
+	 * Clean user ID by removing common prefixes like 'users/', 'guests/', etc.
+	 */
+	private function cleanUserId(string $rawUserId): string {
+		// Remove common prefixes that might be present in actor data
+		if (str_starts_with($rawUserId, 'users/')) {
+			return substr($rawUserId, 6); // Remove 'users/' prefix
+		}
+		if (str_starts_with($rawUserId, 'guests/')) {
+			return substr($rawUserId, 7); // Remove 'guests/' prefix
+		}
+		if (str_starts_with($rawUserId, 'emails/')) {
+			return substr($rawUserId, 7); // Remove 'emails/' prefix
+		}
+		if (str_starts_with($rawUserId, 'federated_users/')) {
+			return substr($rawUserId, 16); // Remove 'federated_users/' prefix
+		}
+		
+		return $rawUserId; // Return as-is if no known prefix
+	}
+	
+	/**
+	 * Format user ID for display as a mention or display name
+	 */
+	private function formatUserForDisplay(string $userId): string {
+		if ($userId === 'unknown' || empty($userId)) {
+			return 'unknown';
+		}
+		
+		// Clean the user ID in case it still has prefixes
+		$cleanUserId = $this->cleanUserId($userId);
+		
+		$user = $this->userManager->get($cleanUserId);
+		if ($user === null) {
+			// User might have been deleted, return formatted mention with original ID
+			return '**@' . $cleanUserId . '**';
+		}
+		
+		// Get display name
+		$displayName = $user->getDisplayName();
+		if ($displayName && $displayName !== $cleanUserId) {
+			// Return mention format with display name
+			return '**@' . $displayName . '**';
+		}
+		
+		// Fallback to mention format with user ID
+		return '**@' . $cleanUserId . '**';
 	}
 
 	/**

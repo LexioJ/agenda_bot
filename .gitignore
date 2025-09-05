@@ -19,7 +19,6 @@
 Thumbs.db
 
 # Nextcloud specific
-/tests/
 /vendor-bin/
 
 # Logs
@@ -38,5 +37,16 @@ Thumbs.db
 *.bak
 *~
 
+# Planning files
+*_PLAN.md
+
 # Local operational docs
 WARP.md
+
+# Development/testing scripts (not for distribution)
+run_tests.sh
+test_*.sh
+tests
+
+# Planning documents (development only)
+ROOM_TIME_CONFIG_PLAN.md

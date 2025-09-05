@@ -115,7 +115,7 @@ class SummaryService {
 		// Add cleanup question if there are completed items
 		if ($agendaData['completed'] > 0) {
 			$summary .= "\n\n🧹 **" . $l->t('Remove completed items from agenda?') . "**\n";
-			$summary .= "*" . $l->t("Moderators/Owners: Reply with 'agenda cleanup'") . "*";
+			$summary .= "*" . $l->t("Moderators/Owners: Reply with 'agenda cleanup' or react with 👍, ✅, or 🧹") . "*";
 		}
 
 		return [

@@ -4,6 +4,8 @@
 
 🌍 **Now with multi-language support!** Available in English and German, with more languages coming soon.
 
+⚡ **NEW in v1.2.0: Room-Level Time Monitoring!** Each Talk room can now have its own time monitoring settings, allowing different teams to customize warning thresholds and monitoring behavior while maintaining backward compatibility with global defaults. [Learn more →](ROOM_TIME_MONITORING.md)
+
 ## Overview
 
 The Agenda Bot is a comprehensive Nextcloud app that transforms how teams manage meeting agendas. Beyond basic agenda management, it provides intelligent time monitoring, permission-based access control, and automated progress tracking to ensure productive and efficient meetings.
@@ -19,7 +21,9 @@ The Agenda Bot is a comprehensive Nextcloud app that transforms how teams manage
 
 ### ⏰ **Intelligent Time Monitoring**
 - **Background monitoring** - Automated time tracking via background job
-- **Configurable warnings** - 80%, 100%, and overtime threshold alerts
+- **Room-level configuration** - Individual time monitoring settings per Talk room
+- **Global fallback** - Rooms without specific settings use global defaults
+- **Configurable warnings** - Custom warning and overtime threshold alerts per room
 - **Call-aware notifications** - Only sends alerts during active calls
 - **Time analytics** - Actual vs. planned duration tracking with visual indicators
 - **Meeting efficiency insights** - Completion rates and timing statistics
@@ -34,7 +38,7 @@ The Agenda Bot is a comprehensive Nextcloud app that transforms how teams manage
 - **Event-driven responses** - Responds to Talk call start/end events
 - **Automatic agenda detection** - Parses agenda items from natural chat messages  
 - **Comprehensive summaries** - Detailed meeting summaries with timing analytics
-- **Cleanup automation** - Optional cleanup of completed items post-meeting
+- **Cleanup automation** - Optional cleanup of completed items post-meeting via text command or emoji reactions (👍, ✅, 🧹)
 
 ### 🌍 **Multi-Language Support**
 - **Separate language bots** - Choose your preferred language when adding the bot
@@ -126,12 +130,15 @@ add: Follow-up actions
 | `move: X to Y` | Move item X to position Y | Moderators, Owners | `move: 3 to 1` |
 | `swap: X,Y` | Swap positions of items X and Y | Moderators, Owners | `swap: 1,3` |
 
-#### Time Management (Optional)
+#### Room-Level Time Management (NEW in v1.2.0)
 | Command | Description | Permissions | Example |
 |---------|-------------|-------------|----------|
-| `time config` | Show time monitoring settings | Moderators, Owners | `time config` |
-| `time enable` / `time disable` | Toggle time monitoring | Moderators, Owners | `time enable` |
-| `time thresholds 80 100 120` | Set warning thresholds (%) | Moderators, Owners | `time thresholds 70 100 130` |
+| `time config` | Show room time monitoring settings | Moderators, Owners | `time config` |
+| `time enable` / `time disable` | Toggle time monitoring for this room | Moderators, Owners | `time enable` |
+| `time warning 75` | Set time limit warning threshold (%) for room | Moderators, Owners | `time warning 75` |
+| `time overtime 110` | Set overtime alert threshold (%) for room | Moderators, Owners | `time overtime 110` |
+| `time thresholds 80 120` | Set both thresholds (warning, overtime) | Moderators, Owners | `time thresholds 70 110` |
+| `time reset` | Reset room to global time monitoring defaults | Moderators, Owners | `time reset` |
 
 ### Example Workflow
 
@@ -183,19 +190,29 @@ add: Follow-up actions
       Item 2 (3 min)
       
       🧹 Remove completed items from agenda?
-      Moderators/Owners: Reply with 'agenda cleanup'
+      Moderators/Owners: Reply with 'agenda cleanup' or react with 👍, ✅, or 🧹
       ```
      
 ## Database Schema
 
-The Agenda Bot uses the `oc_ab_log_entries` table with these key columns:
+The Agenda Bot uses the `oc_ab_log_entries` table for all data storage, including room configurations:
 
-### Core Fields
+### Table: `oc_ab_log_entries`
+
+#### Core Fields
 - `id` - Primary key (bigint, auto-increment)
 - `server` - Server identifier (varchar, typically 'local')
 - `token` - Talk room token (varchar, 64 chars)
-- `type` - Entry type (varchar, 32 chars: agenda_item, start, end, attendee, message, time_warning)
+- `type` - Entry type (varchar, 32 chars: agenda_item, room_config, start, end, attendee, message, time_warning)
 - `details` - Entry content (longtext, JSON or plain text)
+
+#### Entry Types
+- `agenda_item` - Meeting agenda items with duration and status
+- `room_config` - ⚡ Room-specific configuration (NEW in v1.2.0)
+- `start` / `end` - Call session tracking
+- `attendee` - Participant information
+- `message` - Chat messages and summaries
+- `time_warning` - Time monitoring alerts
 
 ### Agenda-Specific Fields
 - `order_position` - Position in agenda (int, for agenda items)
@@ -215,6 +232,28 @@ The Agenda Bot uses the `oc_ab_log_entries` table with these key columns:
 - `ab_completion_status` - (token, type, is_completed)
 - `ab_agenda_order` - (token, order_position)
 
+### Room Configuration Storage ⚡ Smart Design in v1.2.0
+
+Room configurations are stored as `room_config` entries in the existing table:
+
+```json
+{
+  "time_monitoring": {
+    "enabled": true,
+    "warning_threshold": 0.8,
+    "overtime_threshold": 1.2
+  },
+  "configured_by": "user123",
+  "configured_at": 1693872000
+}
+```
+
+**Benefits:**
+- ✨ **Zero schema changes** - Uses existing table structure
+- 🚀 **Instant deployment** - No migrations required
+- 🔄 **Backward compatible** - Existing setups unaffected
+- ⚡ **Efficient queries** - Existing indexes support room config lookups
+
 ## Development
 
 ### Project Structure
@@ -231,40 +270,49 @@ agenda_bot/
 │   │   ├── LogEntry.php         # Database entity with agenda fields
 │   │   └── LogEntryMapper.php   # Database operations & queries
 │   ├── Service/
-│   │   ├── AgendaService.php    # Core agenda logic & item management (l10n)
+│   │   ├── AgendaService.php    # Core agenda logic & room-aware time monitoring (l10n)
 │   │   ├── BotService.php       # Multi-language bot registration & management
-│   │   ├── CommandParser.php    # Message parsing & command detection
+│   │   ├── CommandParser.php    # Message parsing & room-level time commands
 │   │   ├── PermissionService.php # Access control & user permissions (l10n)
-│   │   ├── TimeMonitorService.php # Time tracking & warning system (l10n)
+│   │   ├── RoomConfigService.php # ⚡ Room-specific configuration management
+│   │   ├── TimeMonitorService.php # Time tracking & room-aware warnings (l10n)
 │   │   └── SummaryService.php   # Meeting summaries & analytics (l10n)
 │   ├── BackgroundJob/
-│   │   └── AgendaTimeMonitorJob.php # Background time monitoring
+│   │   └── AgendaTimeMonitorJob.php # Background time monitoring with room filtering
 │   ├── Listener/
-│   │   └── BotInvokeListener.php # Talk event handling with language detection
+│   │   └── BotInvokeListener.php # Talk event handling & room-level commands
 │   └── Migration/
 │       ├── InstallBot.php       # Bot installation repair step
 │       └── Version1000Date...php # Database schema migration
+├── tests/                        # Unit tests for development
+│   ├── Unit/Service/            # Service layer tests
+│   ├── bootstrap.php            # Test bootstrap
+│   └── phpunit.xml              # PHPUnit configuration
 ├── l10n/                         # 🌍 Translation files
-│   ├── en.json                  # English translations (74+ strings)
-│   └── de.json                  # German translations (45+ strings)
+│   ├── en.json                  # English translations (100+ strings)
+│   └── de.json                  # German translations (100+ strings)
 ├── docs/                         # Documentation & screenshots
 ├── CHANGELOG.md                  # Version history & release notes
 ├── MULTILINGUAL_SUPPORT.md       # 🌍 Internationalization documentation
+├── ROOM_TIME_MONITORING.md       # ⚡ Room-level time monitoring guide
 ├── LICENSE                       # AGPL-3.0-or-later
 └── README.md                     # This file
 ```
 
+**Note:** Development and operational files (like `WARP.md`, `run_tests.sh`, and planning documents) are excluded from the public repository via `.gitignore` to maintain a clean distribution.
+
 ### Key Components
 
-1. **AgendaService** - Core agenda functionality, item lifecycle management (🌍 l10n)
-2. **TimeMonitorService** - Intelligent time tracking and warning system (🌍 l10n)
-3. **PermissionService** - Role-based access control and security (🌍 l10n)
-4. **CommandParser** - Advanced message parsing with 15+ command patterns
-5. **BotInvokeListener** - Talk event handling and bot responses (🌍 language detection)
-6. **AgendaTimeMonitorJob** - Background monitoring service
-7. **LogEntryMapper** - Optimized database operations with indexed queries
-8. **SummaryService** - Meeting analytics and comprehensive summaries (🌍 l10n)
-9. **BotService** - Multi-language bot registration and management (🌍 l10n)
+1. **AgendaService** - Core agenda functionality with room-aware time monitoring (🌍 l10n)
+2. **RoomConfigService** - ⚡ Room-specific configuration management with global fallback
+3. **TimeMonitorService** - Intelligent time tracking with room-specific thresholds (🌍 l10n)
+4. **PermissionService** - Role-based access control and security (🌍 l10n)
+5. **CommandParser** - Advanced message parsing with room-level time commands
+6. **BotInvokeListener** - Talk event handling and room-level command routing (🌍 language detection)
+7. **AgendaTimeMonitorJob** - Background monitoring with room filtering
+8. **LogEntryMapper** - Optimized database operations with indexed queries
+9. **SummaryService** - Meeting analytics and comprehensive summaries (🌍 l10n)
+10. **BotService** - Multi-language bot registration and management (🌍 l10n)
 
 ### Development Guidelines
 
@@ -326,12 +374,15 @@ The Agenda Bot uses the `OCA\AgendaBot` namespace and `ab_` database prefixes, e
 | **Guest** | ❌ | ❌ | ❌ | ✅ |
 | **Guest Moderator** | ✅ | ✅ | ✅ | ✅ |
 
-### Time Monitoring Features
-- **Configurable thresholds** - Set custom warning percentages (default: 80%, 100%, 120%)
+### Time Monitoring Features ⚡ Enhanced in v1.2.0
+- **Room-level configuration** - Each room can have custom time monitoring settings
+- **Global fallback** - Rooms without specific configuration use global defaults
+- **Configurable thresholds** - Set custom warning and overtime percentages per room
 - **Smart notifications** - Only alerts during active calls
 - **Duplicate prevention** - Each warning type sent only once per item
-- **Background processing** - Independent monitoring via Nextcloud background jobs
+- **Background processing** - Independent monitoring with room filtering via Nextcloud background jobs
 - **Call-aware** - Automatically detects active calls before sending alerts
+- **Moderator control** - Room moderators can configure monitoring without admin access
 
 ### Meeting Analytics
 - **Completion rates** - Track % of agenda items completed
