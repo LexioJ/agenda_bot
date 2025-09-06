@@ -2,6 +2,20 @@
 
 All notable changes to the Agenda Bot project will be documented in this file.
 
+## [1.3.1] - 2025-09-06
+
+### 🛠️ Fixed - Time Monitoring Bot Name
+- **TimeMonitorService bot name localization**: Fixed time monitoring messages to use proper localized bot name
+  - Time warnings now appear from "Agenda bot" instead of "agenda_bot-bot"
+  - Consistent with BotService naming convention using `$l->t('Agenda bot')`
+  - Supports all configured languages (English, German) with proper translation keys
+  - Maintains consistency across all bot interactions and user-facing messages
+
+### 🔧 Enhanced - Multi-Language Consistency
+- **Localized sender identification**: Time monitor warnings now respect room language settings
+- **Translation alignment**: Bot name display now matches the registered bot names in Talk
+- **Future-ready**: Framework supports additional languages like French ("ordre du jour")
+
 ## [1.3.0] - 2025-09-05
 
 ### 🚀 Added - Bulk Agenda Import

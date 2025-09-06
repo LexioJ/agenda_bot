@@ -204,16 +204,20 @@ class TimeMonitorService {
 
 			// Get room language for proper localization
 			$lang = $this->roomConfigService->getRoomLanguage($token);
+			$l = $this->l10nFactory->get(Application::APP_ID, $lang);
 			
 			// Generate warning message based on type with room language
 			$message = $this->generateWarningMessage($warningType, $item, $elapsedMinutes, $plannedMinutes, $lang);
+			
+			// Use localized bot name to match BotService behavior
+			$botName = $l->t('Agenda bot');
 			
 			// Send message as bot using ChatManager with proper bot actor format
 			$this->chatManager->sendMessage(
 				$room,
 				null, // No participant for bot messages
 				Attendee::ACTOR_BOTS, // Proper actor type for bots
-				'agenda_bot', // Simple bot identifier
+				$botName, // Use localized bot name
 				$message,
 				DateTime::createFromImmutable($this->timeFactory->now()),
 				null, // No reply to message
