@@ -2,6 +2,25 @@
 
 All notable changes to the Agenda Bot project will be documented in this file.
 
+## [1.3.2] - 2025-09-07
+
+### 🔧 Enhanced - User Interface
+- **Enhanced agenda summary header**: Increased agenda summary message header from H3 (`###`) to H2 (`##`) for better visibility
+- **Visual prominence improvement**: Meeting summaries now appear with larger, more prominent headers
+- **Better attention-grabbing**: Makes agenda summaries easier to spot in chat conversations
+
+### 🛠️ Fixed - Reaction-Based Cleanup
+- **Reaction-based cleanup false positives**: Fixed overly broad cleanup detection that incorrectly triggered on unrelated messages
+- **Removed problematic fallback logic**: Eliminated fallback that caused cleanup to trigger when reacting with 👍 to any message containing "agenda" or "summary"
+- **Improved detection precision**: Cleanup via reactions now only works on confirmed agenda summary messages (proper bot-generated summaries)
+- **Enhanced safety**: Prevents false positive cleanups while preserving legitimate summary cleanup functionality
+- **Better logging**: Added detailed debug logging to track cleanup decision-making process
+
+### 🎯 Technical Details
+- **Reaction handler refinement**: Removed broad keyword-based fallback in `handleReactionEvent()` method
+- **Summary message detection**: Now relies on explicit summary message ID tracking and bot emoji detection
+- **Backward compatibility**: Maintains all existing cleanup functionality for legitimate use cases
+
 ## [1.3.1] - 2025-09-06
 
 ### 🛠️ Fixed - Time Monitoring Bot Name

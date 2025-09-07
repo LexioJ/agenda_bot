@@ -61,7 +61,7 @@ Tired of unproductive meetings that run overtime? The Agenda Bot transforms chao
 
 Start having better meetings - Add the Agenda Bot to your Talk rooms and experience the difference!]]></description>
 
-	<version>1.3.1</version>
+	<version>1.3.2</version>
 	<licence>agpl</licence>
 
 	<author>Agenda Bot Team</author>
@@ -80,7 +80,19 @@ Start having better meetings - Add the Agenda Bot to your Talk rooms and experie
 	<bugs>https://github.com/lexioj/agenda_bot/issues</bugs>
 	<repository>https://github.com/lexioj/agenda_bot.git</repository>
 
-	<changelog><![CDATA[## 1.3.1 - Time Monitor Bot Name Fix
+	<changelog><![CDATA[## 1.3.2 - Summary Header & Reaction Cleanup Fix
+
+### 🔧 Enhanced
+- **Enhanced agenda summary header**: Increased agenda summary message header from H3 to H2 for better visibility
+- Visual prominence improvement makes meeting summaries more attention-grabbing
+
+### 🛠️ Fixed
+- **Reaction-based cleanup false positives**: Fixed overly broad cleanup detection that triggered on unrelated messages
+- Removed problematic fallback logic that caused cleanup to trigger when reacting to messages containing "agenda" or "summary"
+- Cleanup via reactions now only works on confirmed agenda summary messages (proper bot-generated summaries)
+- Prevents false positive cleanups while preserving legitimate summary cleanup functionality
+
+## 1.3.1 - Time Monitor Bot Name Fix
 
 ### 🛠️ Fixed
 - **TimeMonitorService bot name localization**: Fixed time monitoring messages to use proper localized bot name

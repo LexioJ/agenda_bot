@@ -59,7 +59,7 @@ class SummaryService {
 			return null;
 		}
 
-		$summary = "### 📋 " . $l->t('Meeting Agenda Summary') . "\n\n";
+		$summary = "## 📋 " . $l->t('Meeting Agenda Summary') . "\n\n";
 		$summary .= "**" . $l->t('Topic:') . "** " . $conversation . "\n";
 		$summary .= "**" . $l->t('Total Agenda Items:') . "** " . $agendaData['total'] . "\n";
 		

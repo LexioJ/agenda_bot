@@ -266,15 +266,9 @@ class BotInvokeListener implements IEventListener {
 			]);
 		}
 		
-		// Final fallback: Check if there are completed items to clean up
-		if (!$isSummaryMessage) {
-			$completedItems = $this->logEntryMapper->findCompletedAgendaItems($token);
-			$isSummaryMessage = !empty($completedItems);
-			$this->logger->debug('Final fallback: checking for completed items', [
-				'completed_items_count' => count($completedItems),
-				'will_process_as_summary' => $isSummaryMessage
-			]);
-		}
+		// No final fallback - only process reactions on confirmed summary messages
+		// This prevents false positives from agenda items, user messages, etc.
+		$this->logger->debug('No broader fallback applied - cleanup only triggers on confirmed summary messages');
 		
 		// Only process reactions if we can confirm it's likely a summary message reaction
 		if (!$isSummaryMessage) {
