@@ -80,6 +80,10 @@ Start having better meetings - Add the Agenda Bot to your Talk rooms and experie
 	<bugs>https://github.com/lexioj/agenda_bot/issues</bugs>
 	<repository>https://github.com/lexioj/agenda_bot.git</repository>
 
+	<screenshot small-thumbnail="https://raw.githubusercontent.com/lexioj/agenda_bot/main/docs/agenda_bot_logo_thumbnail.png">https://raw.githubusercontent.com/lexioj/agenda_bot/main/docs/agenda_bot_logo.png</screenshot>
+   <screenshot>https://raw.githubusercontent.com/lexioj/agenda_bot/main/docs/agenda_bot_meeting_flow.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/lexioj/agenda_bot/main/docs/agenda_bot_help_command.png</screenshot>
+
 	<changelog><![CDATA[## 1.3.4 - Silent Call Detection
 
 ### 🚀 New Features
