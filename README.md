@@ -60,6 +60,16 @@ The Agenda Bot is a comprehensive Nextcloud app that transforms how teams manage
 - Nextcloud 31 or later
 - Nextcloud Talk app installed and enabled
 
+### From Nextcloud App Store (Recommended)
+
+Since this bot is written as a Nextcloud app, simply search for "Agenda Bot" in the Apps section of your Nextcloud server admin interface, or download it directly from the [Nextcloud App Store](https://apps.nextcloud.com/apps/agenda_bot).
+
+**Via Nextcloud Admin Interface:**
+   - Log in as admin to your Nextcloud instance
+   - Go to **Apps** in the admin menu
+   - Search for "Agenda Bot"
+   - Click **Download and enable** to install
+
 ### Manual Installation
 
 1. **Download the app:**
