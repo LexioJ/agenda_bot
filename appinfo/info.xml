@@ -8,9 +8,10 @@
 	<id>agenda_bot</id>
 	<name>Agenda bot</name>
 	<summary><![CDATA[🤖 Transform your Talk meetings with intelligent agenda management, real-time time tracking, and automated progress monitoring!]]></summary>
-	<description><![CDATA[### 🚀 Meeting Management for Nextcloud Talk
+	<description><![CDATA[### 🚀 Meeting Manager for Nextcloud Talk
 
 Tired of unproductive meetings that run overtime? The Agenda Bot transforms chaotic discussions into structured, efficient sessions with intelligent automation and real-time insights.
+**⚠️ Requires Nextcloud Talk app to be installed and enabled**
 
 ### ✨ Key Features
 
@@ -59,7 +60,7 @@ Tired of unproductive meetings that run overtime? The Agenda Bot transforms chao
 - Board meetings requiring structure
 - Training sessions with timed modules
 
-Start having better meetings - Add the Agenda Bot to your Talk rooms and experience the difference!]]></description>
+#### Start having better meetings - Add the Agenda Bot to your Talk rooms and experience the difference!]]></description>
 
 	<version>1.3.4</version>
 	<licence>agpl</licence>

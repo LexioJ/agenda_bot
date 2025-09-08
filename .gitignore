@@ -43,8 +43,11 @@ Thumbs.db
 
 # Local operational docs
 WARP.md
+.warp.md
 
 # Development/testing scripts (not for distribution)
 run_tests.sh
 test_*.sh
 tests
+*.tar.gz
+build/
