@@ -2,6 +2,30 @@
 
 All notable changes to the Agenda Bot project will be documented in this file.
 
+## [1.3.4] - 2025-09-08
+
+### 🚀 Added - Silent Call Detection
+- **Silent call detection**: Bot now intelligently detects when calls are started silently and responds appropriately
+- **Notification-aware responses**: Agenda status messages are sent silently for silent calls to avoid unwanted notifications
+- **Enhanced call handling**: Preserves the intent of silent calls while still providing helpful agenda information
+
+### 🔧 Enhanced - User Experience
+- **Improved user experience**: Silent calls won't trigger notification-heavy agenda messages
+- **Better meeting flow**: Respects user's choice to start calls quietly while maintaining functionality
+- **Smart notification management**: Bot messages match the notification behavior of the call that triggered them
+
+### 🛠️ Technical Improvements
+- **System message parsing**: Enhanced event processing to detect silent call metadata in BotInvokeListener
+- **Fallback detection**: Multiple detection methods ensure reliable silent call identification
+- **Debug logging**: Added comprehensive logging for call event analysis and troubleshooting
+- **Enhanced `isCallStartedSilently()` method**: Analyzes ActivityPub system message events for silent call indicators
+- **Smart response behavior**: Uses `addAnswer($message, $isCallSilent)` to match notification behavior to call type
+
+### 📚 Documentation
+- **Technical documentation**: Added comprehensive `docs/SILENT_CALL_HANDLING.md` with implementation details
+- **Usage examples**: Code snippets and testing guidelines for the new feature
+- **Behavior explanation**: Clear documentation of silent vs. regular call handling
+
 ## [1.3.3] - 2025-09-08
 
 ### 🚀 Added - Welcome Message on Activation
@@ -127,7 +151,7 @@ agenda:
 - **Event actor detection**: Improved handling of reaction events where actor data contains bot info instead of reacting user
 
 ### 📚 Documentation
-- **ROOM_TIME_MONITORING.md**: Comprehensive guide to room-level time monitoring features
+- **docs/ROOM_TIME_MONITORING.md**: Comprehensive guide to room-level time monitoring features
 - **Updated README.md**: Added room-level time monitoring command reference and emoji reaction documentation
 - **Enhanced help system**: Bot help now includes room-level time monitoring commands
 - **Migration guide**: Instructions for gradual adoption of room-specific settings
@@ -223,7 +247,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Graceful fallbacks** to English for missing translations
 
 ### 📚 Documentation
-- **MULTILINGUAL_SUPPORT.md** - Comprehensive implementation guide
+- **docs/MULTILINGUAL_SUPPORT.md** - Comprehensive implementation guide
 - **Translation examples** and usage patterns
 - **Bot registration process** documentation
 - **Future enhancement roadmap**

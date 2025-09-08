@@ -144,22 +144,35 @@ class BotInvokeListener implements IEventListener {
 				return;
 			}
 			
-			if ($data['object']['name'] === 'call_joined' || $data['object']['name'] === 'call_started') {
-				if ($data['object']['name'] === 'call_started') {
-					$this->summaryService->logCallStart($token);
+		if ($data['object']['name'] === 'call_joined' || $data['object']['name'] === 'call_started') {
+			if ($data['object']['name'] === 'call_started') {
+				$this->summaryService->logCallStart($token);
+				
+				// Check if the call was started silently by looking at system message content
+				$isCallSilent = $this->isCallStartedSilently($data);
+				
+				// Log the call detection result for debugging
+				$this->logger->info('Call started - silent detection result', [
+					'token' => $token,
+					'is_silent' => $isCallSilent,
+					'object_name' => $data['object']['name'] ?? 'unknown'
+				]);
+				
+				// Check if there are agenda items
+				$items = $this->agendaService->getAgendaItems($token);
+				if (!empty($items)) {
+					// Auto-set first incomplete item as current
+					$this->autoSetFirstIncompleteItemAsCurrent($token, $lang);
 					
-					// Check if there are agenda items
-					$items = $this->agendaService->getAgendaItems($token);
-					if (!empty($items)) {
-						// Auto-set first incomplete item as current
-						$this->autoSetFirstIncompleteItemAsCurrent($token, $lang);
-						
-						// Show current agenda status
-						$status = $this->agendaService->getAgendaStatus($token, $lang);
-						$event->addAnswer($status, true);
-					}
-					// No message when agenda is empty - silent start
+					// Show current agenda status
+					$status = $this->agendaService->getAgendaStatus($token, $lang);
+					
+					// For silent calls, send the agenda status silently (no notifications)
+					// For regular calls, send with notifications
+					$event->addAnswer($status, $isCallSilent);
 				}
+				// No message when agenda is empty - maintains silent/non-silent behavior
+			}
 
 			// Log attendee
 			$displayName = $data['actor']['name'];
@@ -194,6 +207,55 @@ class BotInvokeListener implements IEventListener {
 		}
 	}
 
+	/**
+	 * Check if the call was started silently based on the system message content
+	 */
+	private function isCallStartedSilently(array $data): bool {
+		// Check if we have the system message content that indicates a silent call
+		$content = $data['object']['content'] ?? '';
+		if (empty($content)) {
+			return false;
+		}
+		
+		try {
+			$messageData = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+			
+			// Check if the system message indicates a call_started event
+			if (!isset($messageData['message']) || $messageData['message'] !== 'call_started') {
+				return false;
+			}
+			
+			// For call_started messages, look for the silent flag in message parameters
+			// This is how Talk internally tracks silent calls
+			if (isset($messageData['parameters']['silent']) && $messageData['parameters']['silent'] === true) {
+				return true;
+			}
+			
+			// As a fallback, check the translated message content for silent indicators
+			// This handles cases where the parsed message contains "silent" keywords
+			if (isset($data['object']['name']) && $data['object']['name'] === 'call_started') {
+				// Look for silent keywords in translated message parameters
+				if (isset($messageData['parameters'])) {
+					foreach ($messageData['parameters'] as $key => $value) {
+						if (is_string($value) && str_contains(strtolower($value), 'silent')) {
+							return true;
+						}
+					}
+				}
+			}
+			
+		} catch (\JsonException $e) {
+			// If we can't parse the content, assume it's not silent
+			$this->logger->debug('Could not parse call event content as JSON', [
+				'content' => $content,
+				'error' => $e->getMessage(),
+				'object_name' => $data['object']['name'] ?? 'unknown'
+			]);
+		}
+		
+		return false;
+	}
+	
 	/**
 	 * Auto-set the first incomplete agenda item as current when call starts
 	 */

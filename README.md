@@ -321,7 +321,8 @@ agenda_bot/
 │   └── de.json                  # German translations (100+ strings)
 ├── docs/                         # 📚 Project documentation
 │   ├── MULTILINGUAL_SUPPORT.md  # 🌍 Internationalization documentation
-│   └── ROOM_TIME_MONITORING.md  # ⚡ Room-level time monitoring guide
+│   ├── ROOM_TIME_MONITORING.md  # ⚡ Room-level time monitoring guide
+│   └── SILENT_CALL_HANDLING.md  # 🔇 Silent call detection & response behavior
 ├── CHANGELOG.md                  # Version history & release notes
 ├── LICENSE                       # AGPL-3.0-or-later
 └── README.md                     # This file
