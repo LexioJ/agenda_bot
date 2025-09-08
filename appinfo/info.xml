@@ -61,7 +61,7 @@ Tired of unproductive meetings that run overtime? The Agenda Bot transforms chao
 
 Start having better meetings - Add the Agenda Bot to your Talk rooms and experience the difference!]]></description>
 
-	<version>1.3.2</version>
+	<version>1.3.3</version>
 	<licence>agpl</licence>
 
 	<author>Agenda Bot Team</author>
@@ -80,54 +80,22 @@ Start having better meetings - Add the Agenda Bot to your Talk rooms and experie
 	<bugs>https://github.com/lexioj/agenda_bot/issues</bugs>
 	<repository>https://github.com/lexioj/agenda_bot.git</repository>
 
-	<changelog><![CDATA[## 1.3.2 - Summary Header & Reaction Cleanup Fix
-
-### 🔧 Enhanced
-- **Enhanced agenda summary header**: Increased agenda summary message header from H3 to H2 for better visibility
-- Visual prominence improvement makes meeting summaries more attention-grabbing
-
-### 🛠️ Fixed
-- **Reaction-based cleanup false positives**: Fixed overly broad cleanup detection that triggered on unrelated messages
-- Removed problematic fallback logic that caused cleanup to trigger when reacting to messages containing "agenda" or "summary"
-- Cleanup via reactions now only works on confirmed agenda summary messages (proper bot-generated summaries)
-- Prevents false positive cleanups while preserving legitimate summary cleanup functionality
-
-## 1.3.1 - Time Monitor Bot Name Fix
-
-### 🛠️ Fixed
-- **TimeMonitorService bot name localization**: Fixed time monitoring messages to use proper localized bot name
-- Time warnings now appear from "Agenda bot" instead of "agenda_bot-bot"
-- Consistent with BotService naming convention using translation keys
-- Supports all configured languages (English, German) with proper localization
-
-## 1.3.0 - Bulk Agenda Import
+	<changelog><![CDATA[## 1.3.3 - Welcome Message Improvements
 
 ### 🚀 New Features
-- **Bulk agenda creation**: Create multiple agenda items with a single message using structured list format
-- **Copy-paste workflow**: Perfect for importing agendas from calendar invitations, meeting templates, or external tools
-- **Flexible bullet format**: Support for both `-` and `*` bullet point markers in bulk import
-- **Safety limits**: Maximum 20 items per bulk operation to prevent abuse
-- **Error resilience**: Graceful handling of invalid items while processing valid ones
+- **Welcome messages on bot activation**: Bot now automatically posts informative welcome messages when activated in new or existing rooms
+- **Usage guidance**: Welcome messages include comprehensive help information and example commands
+- **Deletion option**: Welcome messages include note that users can delete them if desired
 
-### 🔧 Enhancements
-- Enhanced message processing with bulk format detection (takes priority over single items)
-- Intelligent sequential positioning with conflict resolution
-- Complete translation support in English and German for all bulk operation messages
-- Updated help system with bulk format examples and usage instructions
+### 🔧 Enhanced
+- **Improved bot display name**: Welcome messages now appear from "Agenda Bot (Bot)" instead of cryptic bot IDs
+- **Multi-language welcome support**: Welcome messages are properly localized for room language settings
+- **Better user onboarding**: New users immediately see how to use the bot upon activation
 
-### 🎯 Usage Example
-```
-agenda:
-- Welcome & introductions (5 min)
-- Project status review (20 min)
-- Budget discussion (15 min)
-- Next steps planning (10 min)
-- Closing remarks
-```
-
-### 📚 Documentation
-- Updated README.md with "Bulk Agenda Creation" section
-- Enhanced help integration with bulk format examples]]></changelog>
+### 🛠️ Fixed
+- **Bot message posting**: Fixed technical limitation where Join events didn't post messages due to missing IComment objects
+- **Direct ChatManager integration**: Implemented workaround to bypass BotService limitations for activation messages
+- **Enhanced logging**: Added comprehensive debugging for welcome message processing]]></changelog>
 
 	<dependencies>
 		<nextcloud min-version="31" max-version="32" />

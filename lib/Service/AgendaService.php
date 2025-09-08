@@ -901,8 +901,7 @@ class AgendaService {
 		// Base help content available to all users
 		$help = "### 📋 **" . $l->t('Agenda Commands:') . "**\n\n" .
 				"**" . $l->t('Status & Viewing:') . "**\n" .
-				"• `agenda status` - " . $l->t('Show current agenda status') . "\n" .
-				"• `agenda list` - " . $l->t('Show agenda items') . "\n" .
+				"• `agenda status` / `agenda list` - " . $l->t('Show current agenda status and items') . "\n" .
 				"• `agenda help` - " . $l->t('Show this help message') . "\n\n";
 		
 		// Add item commands for users who can add (types 1,2,3,6)

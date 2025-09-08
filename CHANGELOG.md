@@ -2,6 +2,22 @@
 
 All notable changes to the Agenda Bot project will be documented in this file.
 
+## [1.3.3] - 2025-09-08
+
+### 🚀 Added - Welcome Message on Activation
+- Bot now automatically posts a welcome message when activated in a room (new or existing)
+- Welcome includes usage guidance and example commands
+- Note included that the message can be deleted if desired
+
+### 🔧 Enhanced - Bot Identity
+- Welcome message now appears from "Agenda Bot (Bot)" instead of raw bot actor IDs
+- Localization-aware: respects room language for bot name and message content
+
+### 🛠️ Fixed - Posting Logic
+- Resolved issue where Join events didn’t result in posted messages due to lack of IComment
+- Implemented direct ChatManager send for activation events to ensure reliability
+- Added detailed logging for activation and message posting
+
 ## [1.3.2] - 2025-09-07
 
 ### 🔧 Enhanced - User Interface

@@ -17,8 +17,12 @@ use OCA\AgendaBot\Service\SummaryService;
 use OCA\AgendaBot\Service\AgendaService;
 use OCA\AgendaBot\Service\CommandParser;
 use OCA\AgendaBot\Service\RoomConfigService;
+use OCA\Talk\Chat\ChatManager;
 use OCA\Talk\Events\BotInvokeEvent;
+use OCA\Talk\Manager;
+use OCA\Talk\Model\Attendee;
 use OCP\AppFramework\Utility\ITimeFactory;
+use OCP\DB\Exception as DBException;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use OCP\IConfig;
@@ -39,6 +43,8 @@ class BotInvokeListener implements IEventListener {
 		protected LoggerInterface $logger,
 		protected IFactory $l10nFactory,
 		protected RoomConfigService $roomConfigService,
+		protected ChatManager $chatManager,
+		protected Manager $roomManager,
 	) {
 	}
 
@@ -63,10 +69,10 @@ class BotInvokeListener implements IEventListener {
 		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
 		$data = $event->getMessage();
 		
+		
 		// Store room language for background job localization
 		$token = $this->extractTokenFromEventData($data);
 		if ($token) {
-			$this->logger->debug('Storing room language', ['token' => $token, 'language' => $lang, 'event_type' => $data['type']]);
 			$this->roomConfigService->setRoomLanguage($token, $lang);
 		}
 		
@@ -80,7 +86,9 @@ class BotInvokeListener implements IEventListener {
 			// Bot has been activated/enabled in the room - show welcome message
 			$token = $data['object']['id'];
 			$welcome = $this->getBotWelcomeMessage($lang, $token, $data['actor'] ?? []);
-			$event->addAnswer($welcome, true);
+			
+			// Send welcome message directly using ChatManager since BotService doesn't process answers for Join events
+			$this->sendWelcomeMessage($token, $welcome, $data['actor'] ?? [], $lang);
 			return;
 		}
 		
@@ -130,7 +138,9 @@ class BotInvokeListener implements IEventListener {
 			if ($data['object']['name'] === 'bot_enabled' ||
 				$data['object']['name'] === 'bot_installed') {
 				$welcome = $this->getBotWelcomeMessage($lang, $token, $data['actor'] ?? []);
-				$event->addAnswer($welcome, true);
+				
+				// Send welcome message directly using ChatManager
+				$this->sendWelcomeMessage($token, $welcome, $data['actor'] ?? [], $lang);
 				return;
 			}
 			
@@ -204,16 +214,53 @@ class BotInvokeListener implements IEventListener {
 	}
 
 	/**
+	 * Send welcome message directly via ChatManager
+	 */
+	private function sendWelcomeMessage(string $token, string $message, array $actorData, string $lang = 'en'): void {
+		try {
+			$room = $this->roomManager->getRoomByToken($token);
+			$creationDateTime = $this->timeFactory->getDateTime('now', new \DateTimeZone('UTC'));
+			
+			// Get room language for proper localization
+			$roomLang = $this->roomConfigService->getRoomLanguage($token) ?? $lang;
+			$l = $this->l10nFactory->get(Application::APP_ID, $roomLang);
+			
+			// Use localized bot name to match how other bot messages appear - this will show as "Agenda Bot (Bot)"
+			$botDisplayName = $l->t('Agenda bot') . ' (Bot)';
+			
+			$this->chatManager->sendMessage(
+				$room,
+				null, // participant
+				Attendee::ACTOR_BOTS, // actor type  
+				$botDisplayName, // Use friendly display name instead of raw actor ID
+				$message, // message content
+				$creationDateTime, // creation time
+				null, // parent comment (no reply)
+				'', // reference ID
+				false, // not silent
+				rateLimitGuestMentions: false
+			);
+		} catch (\Exception $e) {
+			$this->logger->error('Failed to send welcome message via ChatManager', [
+				'error' => $e->getMessage(),
+				'token' => $token,
+				'exception' => $e
+			]);
+		}
+	}
+	
+	/**
 	 * Get bot welcome message with help
 	 */
 	private function getBotWelcomeMessage(string $lang, string $token = '', array $actorData = []): string {
 		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
 		
-		return "### 🤖 **" . $l->t('Welcome to Agenda Bot!') . "**\n\n" .
+		return "## 🤖 **" . $l->t('Welcome to Agenda Bot!') . "**\n\n" .
 			   $l->t("I'm here to help you manage your meeting agenda and track time.") . "\n\n" .
 			   $this->agendaService->getAgendaHelp($token, $actorData ?: null, $lang) . "\n\n" .
 			   "🎉 **" . $l->t('Ready to get started? Try adding your first agenda item:') . "**\n" .
-			   "• `" . $l->t('agenda: Welcome & introductions (5 min)') . "`";
+			   "• `" . $l->t('agenda: Welcome & introductions (5 min)') . "`\n\n" .
+			   "💡 *" . $l->t('Note: You can delete this welcome message if desired.') . "*";
 	}
 
 	/**
@@ -225,22 +272,13 @@ class BotInvokeListener implements IEventListener {
 		$reaction = $data['content'] ?? '';
 		$actorData = $data['actor'] ?? [];
 		
-		// Debug logging
-		$this->logger->debug('Reaction event received', [
-			'token' => $token,
-			'messageId' => $messageId,
-			'reaction' => $reaction,
-			'room_language' => $this->roomConfigService->getRoomLanguage($token) ?? 'en'
-		]);
 		
 		if (!$messageId) {
-			$this->logger->debug('No message ID in reaction event');
 			return;
 		}
 		
 		// Check if reaction is a cleanup emoji first
 		if (!in_array($reaction, ['🧹', '👍', '✅'])) {
-			$this->logger->debug('Reaction not a cleanup emoji', ['reaction' => $reaction]);
 			return;
 		}
 		
@@ -248,11 +286,6 @@ class BotInvokeListener implements IEventListener {
 		$lastSummaryMessageId = $this->roomConfigService->getLastSummaryMessageId($token);
 		$isSummaryMessage = ($lastSummaryMessageId === $messageId);
 		
-		$this->logger->debug('Checking reaction against stored summary message ID', [
-			'reaction_message_id' => $messageId,
-			'stored_summary_message_id' => $lastSummaryMessageId,
-			'is_summary_message' => $isSummaryMessage
-		]);
 		
 		// Fallback: If no stored message ID, check if message content looks like a summary
 		if (!$isSummaryMessage && isset($data['object']['content'])) {
@@ -260,19 +293,13 @@ class BotInvokeListener implements IEventListener {
 			$messageContent = $messageData['message'] ?? '';
 			// Look for summary characteristics: contains bot emoji and cleanup question
 			$isSummaryMessage = (str_contains($messageContent, '🤖') && str_contains($messageContent, '🧹'));
-			$this->logger->debug('Fallback: checking message content for summary characteristics', [
-				'contains_bot_emoji_and_cleanup' => $isSummaryMessage,
-				'content_preview' => substr($messageContent, 0, 100)
-			]);
 		}
 		
 		// No final fallback - only process reactions on confirmed summary messages
 		// This prevents false positives from agenda items, user messages, etc.
-		$this->logger->debug('No broader fallback applied - cleanup only triggers on confirmed summary messages');
 		
 		// Only process reactions if we can confirm it's likely a summary message reaction
 		if (!$isSummaryMessage) {
-			$this->logger->debug('Not processing reaction - not identified as summary message');
 			return;
 		}
 		
@@ -292,16 +319,12 @@ class BotInvokeListener implements IEventListener {
 		// 3. The reaction itself serves as user consent for cleanup
 		$cleanupResult = $this->agendaService->removeCompletedItems($token, null, $roomLanguage);
 		if ($cleanupResult) {
-			$this->logger->info('Cleanup result', ['result' => $cleanupResult]);
-			
 			// Clear the stored summary message ID since cleanup was successful
 			if ($lastSummaryMessageId === $messageId) {
 				$this->roomConfigService->clearLastSummaryMessageId($token);
 			}
 			
 			$event->addAnswer($cleanupResult, true);
-		} else {
-			$this->logger->warning('No cleanup result returned');
 		}
 	}
 
