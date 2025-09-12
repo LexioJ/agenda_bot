@@ -62,10 +62,10 @@ class BotService {
 		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
 		
 		$event = new BotInstallEvent(
-			$l->t('Agenda bot'),
+			$l->t('Agenda'),
 			$secret . str_replace('_', '', $lang),
 			'nextcloudapp://' . Application::APP_ID . '/' . $lang,
-			$l->t('Agenda bot') . ' (' . $langName . ') - ' . $l->t('Specialized bot for managing meeting agendas and tracking agenda items during Talk calls'),
+			$l->t('Agenda') . ' (' . $langName . ') - ' . $l->t('Specialized bot for managing meeting agendas and tracking agenda items during Talk calls'),
 			features: 4 | 8, // EVENT | REACTION
 		);
 		try {

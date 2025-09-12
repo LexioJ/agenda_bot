@@ -2,6 +2,39 @@
 
 All notable changes to the Agenda Bot project will be documented in this file.
 
+## [1.3.5] - 2025-09-12
+
+### 🔧 Enhanced - Bot Identity & User Experience
+- **Unified bot naming**: Simplified bot names from "Agenda bot" to "Agenda" (English) and "Tagesordnung" (German)
+- **Clean display names**: Eliminated redundant naming like "Agenda bot (Bot)-bot" that occurred due to Nextcloud's automatic bot suffixing
+- **Professional appearance**: Bot now displays as "Agenda (Bot)" or "Tagesordnung (Bot)" across all languages
+- **Consistent branding**: Unified naming throughout bot registration, welcome messages, and all user interactions
+
+### 🛠️ Fixed - Welcome Message Experience
+- **Personal introduction**: Updated welcome messages to be more engaging and personal
+- **Friendly assistant approach**: Bot now introduces itself as "Hi there! I'm your agenda assistant" instead of formal "Welcome to Agenda Bot!"
+- **Clean bot identification**: Fixed welcome message sender to display proper bot name without redundant suffixes
+- **Localized greetings**: German welcome messages now use "Hallo! Ich bin Ihr Tagesordnungs-Assistent" for consistency
+
+### ⚡ Added - Command Flexibility
+- **Enhanced `next:` command**: Added support for `next:` without item number to match `done:` behavior
+- **Consistent workflow**: Both `next:` and `done:` commands now complete current item and auto-advance when used without numbers
+- **Intuitive shortcuts**: Users can choose whichever command feels more natural for their workflow
+- **Backward compatibility**: All existing `next: X` functionality preserved for setting specific agenda items as current
+
+### 🌍 Enhanced - Multi-Language Support
+- **Translation consistency**: Updated all translation files to use simplified bot names
+- **Welcome message localization**: Improved German translations for more natural, professional tone
+- **Command documentation**: Updated help and documentation to reflect new command flexibility
+- **Language-aware naming**: Bot registration respects language preferences with appropriate names
+
+### 🛠️ Technical Improvements
+- **CommandParser**: Enhanced `NEXT_PATTERN` regex to support optional item numbers
+- **AgendaService**: Updated `setCurrentAgendaItem()` method to handle null position parameter
+- **BotService**: Simplified bot registration to use clean base names
+- **Translation updates**: Comprehensive updates to English and German language files
+- **Code consistency**: Improved method signatures and parameter handling across services
+
 ## [1.3.4] - 2025-09-08
 
 ### 🚀 Added - Silent Call Detection

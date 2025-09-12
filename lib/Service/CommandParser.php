@@ -19,7 +19,7 @@ class CommandParser {
 	public const CLEAR_COMMAND_PATTERN = '/^agenda\s*clear$/i';
 	public const COMPLETE_PATTERN = '/^(complete|done|close)\s*:?\s*(\d+)?$/i';
 	public const REOPEN_PATTERN = '/^(incomplete|undone|reopen)\s*:\s*(\d+)$/i';
-	public const NEXT_PATTERN = '/^next\s*:\s*(\d+)$/i';
+	public const NEXT_PATTERN = '/^next\s*:?\s*(\d+)?$/i';
 	public const REORDER_PATTERN = '/^reorder\s*:\s*((?:\d+,?\s*)+)$/i';
 	public const MOVE_PATTERN = '/^move\s*:\s*(\d+)\s+to\s+(\d+)$/i';
 	public const SWAP_PATTERN = '/^swap\s*:\s*(\d+),\s*(\d+)$/i';
@@ -89,7 +89,7 @@ class CommandParser {
 			return [
 				'command' => 'next',
 				'token' => $token,
-				'item' => (int)$matches[1]
+				'item' => isset($matches[1]) && $matches[1] !== '' ? (int)$matches[1] : null
 			];
 		}
 

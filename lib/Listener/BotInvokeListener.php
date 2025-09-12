@@ -287,8 +287,8 @@ class BotInvokeListener implements IEventListener {
 			$roomLang = $this->roomConfigService->getRoomLanguage($token) ?? $lang;
 			$l = $this->l10nFactory->get(Application::APP_ID, $roomLang);
 			
-			// Use localized bot name to match how other bot messages appear - this will show as "Agenda Bot (Bot)"
-			$botDisplayName = $l->t('Agenda bot') . ' (Bot)';
+			// Use localized bot name to match how other bot messages appear
+			$botDisplayName = $l->t('Agenda');
 			
 			$this->chatManager->sendMessage(
 				$room,
@@ -317,8 +317,8 @@ class BotInvokeListener implements IEventListener {
 	private function getBotWelcomeMessage(string $lang, string $token = '', array $actorData = []): string {
 		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
 		
-		return "## 🤖 **" . $l->t('Welcome to Agenda Bot!') . "**\n\n" .
-			   $l->t("I'm here to help you manage your meeting agenda and track time.") . "\n\n" .
+	return "### 👋 **" . $l->t('Hi there! I\'m your agenda assistant') . "** 🤖\n\n" .
+			   $l->t("I'm here to help you stay organized and keep your meetings on track with smart agenda management and time tracking.") . "\n\n" .
 			   $this->agendaService->getAgendaHelp($token, $actorData ?: null, $lang) . "\n\n" .
 			   "🎉 **" . $l->t('Ready to get started? Try adding your first agenda item:') . "**\n" .
 			   "• `" . $l->t('agenda: Welcome & introductions (5 min)') . "`\n\n" .

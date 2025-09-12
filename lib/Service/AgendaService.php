@@ -431,8 +431,10 @@ class AgendaService {
 
 	/**
 	 * Set the current agenda item (requires moderator permissions)
+	 * If position is null, behaves like done: - completes current item and moves to next
+	 * If position is specified, sets that item as current
 	 */
-	public function setCurrentAgendaItem(string $token, int $position, ?array $actorData = null, string $lang = 'en'): ?string {
+	public function setCurrentAgendaItem(string $token, ?int $position = null, ?array $actorData = null, string $lang = 'en'): ?string {
 		// Check moderator permissions if actor data is provided
 		if ($actorData !== null && !$this->permissionService->isActorModerator($token, $actorData)) {
 			$l = $this->l10nFactory->get(Application::APP_ID, $lang);
@@ -440,6 +442,12 @@ class AgendaService {
 		}
 		
 		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
+		// If no position specified, behave like done: - complete current and move to next
+		if ($position === null) {
+			return $this->completeItem($token, null, $actorData, $lang);
+		}
+		
 		$item = $this->logEntryMapper->findAgendaItemByPosition($token, $position);
 		if (!$item) {
 			return '❌ ' . $l->t('Agenda item %d not found', [$position]);
@@ -909,9 +917,9 @@ class AgendaService {
 			$help .= "**" . $l->t('Adding Items:') . "**\n" .
 					 "• `agenda: Topic name (15 min)` - " . $l->t('Add agenda item with time') . "\n" .
 					 "• `topic: Meeting topic (1h)` - " . $l->t('Alternative syntax') . "\n" .
-					 "• `add: Another topic` - " . $l->t('Add item (10 min default)') . "\n" .
+					 "• `add: Another topic` - " . $l->t('Add item (10 min default)') . "\n\n" .
 					 "**" . $l->t('Bulk Agenda Creation:') . "**\n" .
-					 "``` \n" .
+					 "``` " .
 					 "agenda:\n" .
 					 "- Item 1 (15m)\n" .
 					 "- Item 2 (30m)\n" .
@@ -929,18 +937,16 @@ class AgendaService {
 		// Full moderator commands for types 1,2,6 (Owner, Moderator, Guest with moderator permissions)
 		if ($isModerator) {
 			$help .= "\n**" . $l->t('Moderator Commands:') . "**\n" .
-					 "• `agenda clear` - " . $l->t('Clear all agenda items') . " 🔒\n" .
-					 "• `cleanup` / `agenda cleanup` - " . $l->t('Remove completed items') . " 🔒\n" .
-					 "• `next: 2` - " . $l->t('Set agenda item %d as current', [2]) . " 🔒\n" .
-					 "• `complete: 1` / `done: 1` / `close: 1` - " . $l->t('Mark item as completed') . " 🔒\n" .
 					 "• `done:` - " . $l->t('Complete current item and move to next') . " 🔒\n" .
-					 "• `incomplete: 1` / `undone: 1` / `reopen: 1` - " . $l->t('Reopen completed item') . " 🔒\n" .
-					 "• `time enable` / `time disable` - " . $l->t('Enable/disable time warnings') . " 🔒\n" .
-					 "• `time thresholds 75 100 125` - " . $l->t('Set warning thresholds (percentages)') . " 🔒\n" .
-					 "• `reorder: 2,1,4,3` - " . $l->t('Reorder agenda items') . " 🔒\n" .
+					 "• `next: 2` - " . $l->t('Set agenda item %d as current', [2]) . " 🔒\n" .
+					 "• `complete: 2` / `done: 3` / `close: 1` - " . $l->t('Mark item as completed') . " 🔒\n" .
+					 "• `incomplete: 3` / `undone: 1` / `reopen: 2` - " . $l->t('Reopen completed item') . " 🔒\n" .
+					 "• `reorder: 2,1,3` - " . $l->t('Reorder agenda items') . " 🔒\n" .
 					 "• `move: 3 to 1` - " . $l->t('Move item %d to position %d', [3, 1]) . " 🔒\n" .
 					 "• `swap: 1,3` - " . $l->t('Swap agenda items %d and %d', [1, 3]) . " 🔒\n" .
-					 "• `remove: 2` / `delete: 2` - " . $l->t('Remove agenda item %d', [2]) . " 🔒\n\n" .
+					 "• `remove: 2` / `delete: 2` - " . $l->t('Remove agenda item %d', [2]) . " 🔒\n" .
+					 "• `cleanup` / `agenda cleanup` - " . $l->t('Remove completed items') . " 🔒\n" .					 
+					 "• `agenda clear` - " . $l->t('Clear all agenda items') . " 🔒\n\n" .
 					 "*" . $l->t('🔒 Require moderator/owner access') . "*";
 		} else {
 			// Show different messages based on participant type
