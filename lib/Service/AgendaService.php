@@ -919,12 +919,10 @@ class AgendaService {
 					 "• `topic: Meeting topic (1h)` - " . $l->t('Alternative syntax') . "\n" .
 					 "• `add: Another topic` - " . $l->t('Add item (10 min default)') . "\n\n" .
 					 "**" . $l->t('Bulk Agenda Creation:') . "**\n" .
-					 "``` " .
-					 "agenda:\n" .
-					 "- Item 1 (15m)\n" .
-					 "- Item 2 (30m)\n" .
-					 "- Item 3\n" .
-					 "```\n" .
+					 "`agenda:`\n" .
+					 "`- Item 1 (15m)`\n" .
+					 "`- Item 2 (30m)`\n" .
+					 "`- Item 3`\n" .
 					 "*" . $l->t('Create multiple agenda items at once by using:') . "* `agenda:` + *" . $l->t('Multiple agenda items using bullet points') . "*\n" .
 					 "*" . $l->t('Maximum %d items per bulk operation', [self::MAX_BULK_ITEMS]) . "*\n" .
 					 "**" . $l->t('Time Formats:') . "** `(5 m)`, `(10 min)`, `(1h)`, `(2 hours)`, `(90 min)`\n\n";
