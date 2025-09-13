@@ -41,6 +41,7 @@ class AgendaService {
 		private LoggerInterface $logger,
 		private IFactory $l10nFactory,
 		private IUserManager $userManager,
+		private TimingUtilityService $timingUtilityService,
 	) {
 	}
 
@@ -50,7 +51,7 @@ class AgendaService {
 	public function parseAgendaItem(string $message): ?array {
 		if (preg_match(self::AGENDA_PATTERN, $message, $matches)) {
 			$durationText = isset($matches[4]) && $matches[4] !== '' ? trim($matches[4]) : '';
-			$durationMinutes = $this->parseDurationToMinutes($durationText);
+			$durationMinutes = $this->timingUtilityService->parseDurationToMinutes($durationText);
 			
 			return [
 				'title' => trim($matches[3]),
@@ -93,7 +94,7 @@ class AgendaService {
 			// Check if line matches bullet pattern
 			if (preg_match(self::BULLET_ITEM_PATTERN, $trimmedLine, $itemMatches)) {
 				$durationText = isset($itemMatches[3]) && $itemMatches[3] !== '' ? trim($itemMatches[3]) : '';
-				$durationMinutes = $this->parseDurationToMinutes($durationText);
+				$durationMinutes = $this->timingUtilityService->parseDurationToMinutes($durationText);
 				$title = trim($itemMatches[2]);
 				
 				// Skip items with empty titles
@@ -130,57 +131,7 @@ class AgendaService {
 		];
 	}
 
-	/**
-	 * Parse various duration formats into minutes
-	 * Supports: (1 m), (2min), (3 min), (4m), (5 m), (1h), (2 h), (3 hour), (4 hours)
-	 */
-	private function parseDurationToMinutes(string $durationText): int {
-		if (empty($durationText)) {
-			return 10; // Default 10 minutes
-		}
-		
-		// Remove common words and normalize spacing
-		$normalized = strtolower(trim($durationText));
-		
-		// Pattern for hours: (1h), (2 h), (3 hour), (4 hours)
-		if (preg_match('/^(\d+)\s*(?:h|hour|hours)$/i', $normalized, $matches)) {
-			return (int)$matches[1] * 60; // Convert hours to minutes
-		}
-		
-		// Pattern for minutes: (1 m), (2min), (3 min), (4m), (5 m)
-		if (preg_match('/^(\d+)\s*(?:m|min|mins|minute|minutes)$/i', $normalized, $matches)) {
-			return (int)$matches[1];
-		}
-		
-		// If it's just a number, assume minutes
-		if (preg_match('/^(\d+)$/', $normalized, $matches)) {
-			return (int)$matches[1];
-		}
-		
-		// Fallback to default
-		return 10;
-	}
 
-	/**
-	 * Format duration in minutes to a human-readable string
-	 * Returns "x h y min" for durations >= 60 minutes, "x min" otherwise
-	 */
-	private function formatDurationDisplay(int $minutes, string $lang = 'en'): string {
-		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
-		
-		if ($minutes < 60) {
-			return $minutes . ' ' . $l->t('min');
-		}
-		
-		$hours = intval($minutes / 60);
-		$remainingMinutes = $minutes % 60;
-		
-		if ($remainingMinutes === 0) {
-			return $hours . ' ' . $l->t('h');
-		}
-		
-		return $hours . ' ' . $l->t('h %d min', [$remainingMinutes]);
-	}
 
 	/**
 	 * Add agenda item (requires add permissions: types 1,2,3,6)
@@ -218,14 +169,14 @@ class AgendaService {
 
 		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
 		
-	return [
-			'success' => true,
-			'message' => '📋 ' . $l->t('Added agenda item %d: %s (%s)', [
-				$position,
-				$title,
-				$this->formatDurationDisplay($duration, $lang)
-			]),
-		];
+			return [
+				'success' => true,
+				'message' => '📋 ' . $l->t('Added agenda item %d: %s (%s)', [
+					$position,
+					$title,
+					$this->timingUtilityService->formatDurationDisplay($duration, $lang)
+				]),
+			];
 	}
 	
 	/**
@@ -297,7 +248,7 @@ class AgendaService {
 					'position' => $position,
 					'title' => $itemData['title'],
 					'duration' => $itemData['duration'],
-					'duration_display' => $this->formatDurationDisplay($itemData['duration'], $lang)
+					'duration_display' => $this->timingUtilityService->formatDurationDisplay($itemData['duration'], $lang)
 				];
 				
 				// Update current position for next item (if no explicit position)
@@ -369,7 +320,7 @@ class AgendaService {
 		return $items;
 	}
 
-	/**
+/**
 	 * Get agenda status
 	 */
 	public function getAgendaStatus(string $token, string $lang = 'en'): string {
@@ -389,9 +340,9 @@ class AgendaService {
 			
 			// Check if this is the current item
 			if ($currentItem && $currentItem->getOrderPosition() === $item['position']) {
-				$timeSpent = $this->getTimeSpentOnItem($currentItem);
-				$timeSpentDisplay = $this->formatDurationDisplay($timeSpent, $lang);
-				$plannedDisplay = $this->formatDurationDisplay($item['duration'], $lang);
+			$timeSpent = $this->timingUtilityService->getTimeSpentOnItem($currentItem);
+				$timeSpentDisplay = $this->timingUtilityService->formatDurationDisplay($timeSpent, $lang);
+				$plannedDisplay = $this->timingUtilityService->formatDurationDisplay($item['duration'], $lang);
 				$timeInfo = " *({$timeSpentDisplay}/{$plannedDisplay})*";
 				$prefix = "`🗣️ {$item['position']} {$item['title']}`";
 				$title = '';
@@ -399,15 +350,15 @@ class AgendaService {
 				$icon = $l->t('Completed') . ' ';
 				$actualDuration = 0;
 				if (!empty($item['start_time']) && !empty($item['completed_at'])) {
-					$actualDuration = (int) ceil(($item['completed_at'] - $item['start_time']) / 60);
+					$actualDuration = $this->timingUtilityService->calculateActualDurationFromTimestamps($item['start_time'], $item['completed_at']);
 				}
-				$actualDisplay = $this->formatDurationDisplay($actualDuration, $lang);
-				$plannedDisplay = $this->formatDurationDisplay($item['duration'], $lang);
+				$actualDisplay = $this->timingUtilityService->formatDurationDisplay($actualDuration, $lang);
+				$plannedDisplay = $this->timingUtilityService->formatDurationDisplay($item['duration'], $lang);
 				$timeInfo = " *(" . $l->t('%s/%s', [$actualDisplay, $plannedDisplay]) . ")*";
 				$title = $item['title'];
 			} else {
 				$icon = $l->t('Pending') . ' ';
-				$timeInfo = " *(" . $l->t('%s', [$this->formatDurationDisplay($item['duration'], $lang)]) . ")*";
+				$timeInfo = " *(" . $l->t('%s', [$this->timingUtilityService->formatDurationDisplay($item['duration'], $lang)]) . ")*";
 				$title = $item['title'];
 			}
 			
@@ -419,7 +370,40 @@ class AgendaService {
 			}
 		}
 
+		// Add timing summary at the end if there are any completed items or a current item
+		$timingSummary = $this->generateTimingSummary($items, $currentItem, $lang);
+		if (!empty($timingSummary)) {
+			$status .= "\n" . $timingSummary;
+		}
+
 		return $status;
+	}
+
+	/**
+	 * Generate timing summary for agenda status overview
+	 */
+	private function generateTimingSummary(array $items, ?LogEntry $currentItem, string $lang): string {
+		if (empty($items)) {
+			return '';
+		}
+		
+		// Calculate total planned time
+		$totalPlannedMinutes = array_sum(array_column($items, 'duration'));
+		
+		// Calculate actual time using utility service
+		$timingData = $this->timingUtilityService->calculateActualTimeSpent($items, $currentItem);
+		
+		// Generate timing summary string (single-line for compact status display)
+		return $this->timingUtilityService->generateTimingSummaryString(
+			$totalPlannedMinutes,
+			$timingData['total_actual_minutes'],
+			$timingData['has_actual_time'],
+			$lang,
+			"---\n*",
+			"*",
+			false, // no bold formatting
+			false  // single-line format for agenda status
+		);
 	}
 
 	/**
@@ -467,7 +451,7 @@ class AgendaService {
 		$item->setStartTime($this->timeFactory->now()->getTimestamp());
 		$this->logEntryMapper->update($item);
 
-	$plannedDisplay = $this->formatDurationDisplay($item->getDurationMinutes(), $lang);
+	$plannedDisplay = $this->timingUtilityService->formatDurationDisplay($item->getDurationMinutes(), $lang);
 	return '🗣️ ' . $l->t('Set agenda item %d as current:', [$position]) . "\n`" . $item->getDetails() . "`\n*" . $l->t('Planned duration: %s', [$plannedDisplay]) . "*";
 	}
 
@@ -491,42 +475,7 @@ class AgendaService {
 		$this->clearAllCurrentItems($token);
 	}
 
-	/**
-	 * Get time spent on an agenda item in minutes
-	 */
-	private function getTimeSpentOnItem(LogEntry $item): int {
-		if ($item->getStartTime() === null) {
-			return 0;
-		}
 
-		$now = $this->timeFactory->now()->getTimestamp();
-		$timeSpent = $now - $item->getStartTime();
-		
-		// Convert seconds to minutes, round up
-		return (int) ceil($timeSpent / 60);
-	}
-
-	/**
-	 * Get actual duration spent on a completed agenda item in minutes
-	 */
-	private function getActualDurationForCompletedItem(string $token, int $position): int {
-		$item = $this->logEntryMapper->findAgendaItemByPosition($token, $position);
-		
-		if (!$item || !$item->getIsCompleted()) {
-			return 0;
-		}
-		
-		// If we don't have start time or completed time, return 0
-		if ($item->getStartTime() === null || $item->getCompletedAt() === null) {
-			return 0;
-		}
-		
-		// Calculate actual time spent from start to completion
-		$timeSpent = $item->getCompletedAt() - $item->getStartTime();
-		
-		// Convert seconds to minutes, round up
-		return (int) ceil($timeSpent / 60);
-	}
 
 	/**
 	 * Move to the next incomplete agenda item
@@ -619,10 +568,10 @@ class AgendaService {
 		// Build response based on whether this was the current item
 		if ($isCurrentItem) {
 			// Calculate timing details for current item completion
-			$actualTime = $this->getTimeSpentOnItem($itemToComplete);
+			$actualTime = $this->timingUtilityService->getTimeSpentOnItem($itemToComplete);
 			$plannedTime = $itemToComplete->getDurationMinutes();
-			$actualDisplay = $this->formatDurationDisplay($actualTime, $lang);
-			$plannedDisplay = $this->formatDurationDisplay($plannedTime, $lang);
+			$actualDisplay = $this->timingUtilityService->formatDurationDisplay($actualTime, $lang);
+			$plannedDisplay = $this->timingUtilityService->formatDurationDisplay($plannedTime, $lang);
 			
 			$response = "✅ " . $l->t('Completed agenda item %d: **"%s"** (%s/%s)', [
 				$itemToComplete->getOrderPosition(), 
@@ -634,7 +583,7 @@ class AgendaService {
 			// Move to next incomplete item since we completed the current one
 			$nextItem = $this->moveToNextIncompleteItem($token);
 			if ($nextItem) {
-				$nextPlannedDisplay = $this->formatDurationDisplay($nextItem->getDurationMinutes(), $lang);
+				$nextPlannedDisplay = $this->timingUtilityService->formatDurationDisplay($nextItem->getDurationMinutes(), $lang);
 				$response .= "\n🗣️ " . $l->t('Moving to next item %d:', [$nextItem->getOrderPosition()]);
 				$response .= "\n`" . $nextItem->getDetails() . "`";
 				$response .= "\n*" . $l->t('Planned duration: %s', [$nextPlannedDisplay]) . "*";
@@ -647,6 +596,93 @@ class AgendaService {
 		}
 		
 		return $response;
+	}
+
+	/**
+	 * Modify existing agenda item title and/or duration (requires moderator permissions or item creator)
+	 */
+	public function modifyAgendaItem(string $token, int $position, ?string $newTitle, ?string $newDuration, ?array $actorData = null, string $lang = 'en'): ?string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
+		// Check if both parameters are null or empty
+		if (($newTitle === null || trim($newTitle) === '') && ($newDuration === null || trim($newDuration) === '')) {
+			return '❌ ' . $l->t('Please specify new title, duration, or both');
+		}
+		
+		// Find the agenda item
+		$item = $this->logEntryMapper->findAgendaItemByPosition($token, $position);
+		if (!$item) {
+			return '❌ ' . $l->t('Agenda item %d not found', [$position]);
+		}
+		
+		// Cannot modify completed items
+		if ($item->getIsCompleted()) {
+			return '❌ ' . $l->t('Cannot modify completed item %d. Use "reopen: %d" first', [$position, $position]);
+		}
+		
+		// Check permissions - moderators/owners can modify any item
+		if ($actorData !== null && !$this->permissionService->isActorModerator($token, $actorData)) {
+			// TODO: In future enhancement, add logic to check if user created this item
+			// For now, only moderators/owners can modify items
+			return $this->permissionService->getPermissionDeniedMessage($l->t('modify agenda items'), $lang);
+		}
+		
+		$changes = [];
+		$originalTitle = $item->getDetails();
+		$originalDuration = $item->getDurationMinutes();
+		
+		// Update title if provided
+		if ($newTitle !== null && trim($newTitle) !== '') {
+			$cleanTitle = trim($newTitle);
+			if ($cleanTitle !== $originalTitle) {
+				$item->setDetails($cleanTitle);
+				$changes[] = $l->t('title updated');
+			}
+		}
+		
+		// Update duration if provided
+		if ($newDuration !== null && trim($newDuration) !== '') {
+			$cleanDuration = trim($newDuration);
+			$durationMinutes = $this->timingUtilityService->parseDurationToMinutes($cleanDuration);
+			
+			if ($durationMinutes <= 0) {
+				return '❌ ' . $l->t('Invalid duration format. Use (5 min), (1h), etc.');
+			}
+			
+			if ($durationMinutes !== $originalDuration) {
+				$item->setDurationMinutes($durationMinutes);
+				
+				// Reset time warnings when duration changes
+				$item->setWarningSent(false);
+				
+				$changes[] = $l->t('duration updated');
+			}
+		}
+		
+		// If no actual changes were made
+		if (empty($changes)) {
+			return 'ℹ️ ' . $l->t('No changes made to agenda item %d', [$position]);
+		}
+		
+		// Save changes
+		try {
+			$this->logEntryMapper->update($item);
+			
+			// Build response message
+			$response = '✏️ ' . $l->t('Modified agenda item %d: "%s"', [$position, $item->getDetails()]);
+			$response .= ' (' . $this->timingUtilityService->formatDurationDisplay($item->getDurationMinutes(), $lang) . ')';
+			$response .= ' - ' . implode(', ', $changes);
+			
+			return $response;
+			
+		} catch (\Exception $e) {
+			$this->logger->error('Failed to modify agenda item', [
+				'token' => $token,
+				'position' => $position,
+				'error' => $e->getMessage()
+			]);
+			return '❌ ' . $l->t('Failed to modify agenda item %d', [$position]);
+		}
 	}
 
 	/**
@@ -744,8 +780,15 @@ class AgendaService {
 			}
 		}
 		
-		// Prepare room configuration
-		$roomConfig = [];
+		// Get current configuration to preserve existing values
+		$currentConfig = $this->getTimeMonitoringConfig($token);
+		
+		// Prepare room configuration by merging new values with current ones
+		$roomConfig = [
+			'enabled' => $currentConfig['enabled'],
+			'warning_threshold' => $currentConfig['warning_threshold'],
+			'overtime_threshold' => $currentConfig['overtime_threshold']
+		];
 		
 		if (isset($config['enabled'])) {
 			$roomConfig['enabled'] = (bool)$config['enabled'];
@@ -919,12 +962,10 @@ class AgendaService {
 					 "• `topic: Meeting topic (1h)` - " . $l->t('Alternative syntax') . "\n" .
 					 "• `add: Another topic` - " . $l->t('Add item (10 min default)') . "\n\n" .
 					 "**" . $l->t('Bulk Agenda Creation:') . "**\n" .
-					 "``` " .
-					 "agenda:\n" .
-					 "- Item 1 (15m)\n" .
-					 "- Item 2 (30m)\n" .
-					 "- Item 3\n" .
-					 "```\n" .
+					 "`agenda:`\n" .
+					 "`- Item 1 (15m)`\n" .
+					 "`- Item 2 (30m)`\n" .
+					 "`- Item 3`\n" .
 					 "*" . $l->t('Create multiple agenda items at once by using:') . "* `agenda:` + *" . $l->t('Multiple agenda items using bullet points') . "*\n" .
 					 "*" . $l->t('Maximum %d items per bulk operation', [self::MAX_BULK_ITEMS]) . "*\n" .
 					 "**" . $l->t('Time Formats:') . "** `(5 m)`, `(10 min)`, `(1h)`, `(2 hours)`, `(90 min)`\n\n";
@@ -941,6 +982,7 @@ class AgendaService {
 					 "• `next: 2` - " . $l->t('Set agenda item %d as current', [2]) . " 🔒\n" .
 					 "• `complete: 2` / `done: 3` / `close: 1` - " . $l->t('Mark item as completed') . " 🔒\n" .
 					 "• `incomplete: 3` / `undone: 1` / `reopen: 2` - " . $l->t('Reopen completed item') . " 🔒\n" .
+					 "• `change: 2 New Title (30 min)` - " . $l->t('Modify agenda item title/duration') . " 🔒\n" .
 					 "• `reorder: 2,1,3` - " . $l->t('Reorder agenda items') . " 🔒\n" .
 					 "• `move: 3 to 1` - " . $l->t('Move item %d to position %d', [3, 1]) . " 🔒\n" .
 					 "• `swap: 1,3` - " . $l->t('Swap agenda items %d and %d', [1, 3]) . " 🔒\n" .
@@ -1242,7 +1284,7 @@ class AgendaService {
 		foreach ($completed as $item) {
 			$actualDuration = 0;
 			if (!empty($item['start_time']) && !empty($item['completed_at'])) {
-				$actualDuration = (int) ceil(($item['completed_at'] - $item['start_time']) / 60);
+				$actualDuration = $this->timingUtilityService->calculateActualDurationFromTimestamps($item['start_time'], $item['completed_at']);
 			}
 			$plannedDuration = $item['duration'];
 			$timeDiff = $actualDuration - $plannedDuration;

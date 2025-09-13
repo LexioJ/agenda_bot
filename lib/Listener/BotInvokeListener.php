@@ -16,6 +16,7 @@ use OCA\AgendaBot\Model\LogEntryMapper;
 use OCA\AgendaBot\Service\SummaryService;
 use OCA\AgendaBot\Service\AgendaService;
 use OCA\AgendaBot\Service\CommandParser;
+use OCA\AgendaBot\Service\PermissionService;
 use OCA\AgendaBot\Service\RoomConfigService;
 use OCA\Talk\Chat\ChatManager;
 use OCA\Talk\Events\BotInvokeEvent;
@@ -39,6 +40,7 @@ class BotInvokeListener implements IEventListener {
 		protected SummaryService $summaryService,
 		protected AgendaService $agendaService,
 		protected CommandParser $commandParser,
+		protected PermissionService $permissionService,
 		protected IConfig $config,
 		protected LoggerInterface $logger,
 		protected IFactory $l10nFactory,
@@ -425,6 +427,9 @@ class BotInvokeListener implements IEventListener {
 			case 'remove':
 				return $this->agendaService->removeAgendaItem($command['token'], $command['item'], $actorData ?: null, $lang);
 
+			case 'change':
+				return $this->agendaService->modifyAgendaItem($command['token'], $command['item'], $command['new_title'], $command['new_duration'], $actorData ?: null, $lang);
+
 			// Room-level time monitoring commands
 			case 'time_config':
 				return $this->agendaService->getTimeMonitoringStatus($command['token'], $lang);
@@ -457,12 +462,12 @@ class BotInvokeListener implements IEventListener {
 				$l = $this->l10nFactory->get(Application::APP_ID, $lang);
 				
 				// Check moderator permissions
-				if (!empty($actorData) && !$this->agendaService->getPermissionService()->isActorModerator($command['token'], $actorData)) {
-					return $this->agendaService->getPermissionService()->getPermissionDeniedMessage($l->t('configure time monitoring settings'), $lang);
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($command['token'], $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('configure time monitoring settings'), $lang);
 				}
 				
 				// Call reset method via RoomConfigService
-				$reset = $this->agendaService->getRoomConfigService()->resetRoomConfig($command['token']);
+				$reset = $this->roomConfigService->resetRoomConfig($command['token']);
 				if ($reset) {
 					return '✅ ' . $l->t('Room time monitoring reset to global defaults');
 				} else {
