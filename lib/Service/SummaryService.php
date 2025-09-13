@@ -23,6 +23,7 @@ class SummaryService {
 		protected IConfig $config,
 		protected AgendaService $agendaService,
 		protected IFactory $l10nFactory,
+		protected TimingUtilityService $timingUtilityService,
 	) {
 	}
 
@@ -61,6 +62,13 @@ class SummaryService {
 
 		$summary = "## 📋 " . $l->t('Meeting Agenda Summary') . "\n\n";
 		$summary .= "**" . $l->t('Topic:') . "** " . $conversation . "\n";
+		
+		// Add timing summary right after topic
+		$timingSummary = $this->generateMeetingTimingSummary($agendaData, $lang);
+		if (!empty($timingSummary)) {
+			$summary .= $timingSummary . "\n";
+		}
+		
 		$summary .= "**" . $l->t('Total Agenda Items:') . "** " . $agendaData['total'] . "\n";
 		
 		// Enhanced completed section with timing percentages
@@ -150,4 +158,32 @@ class SummaryService {
 		$entry->setDetails((string)$this->timeFactory->now()->getTimestamp());
 		$this->logEntryMapper->insert($entry);
 	}
+
+	/**
+	 * Generate timing summary for meeting summary page
+	 */
+	private function generateMeetingTimingSummary(array $agendaData, string $lang): string {
+		if (empty($agendaData['items'])) {
+			return '';
+		}
+		
+		// Calculate total planned time
+		$totalPlannedMinutes = array_sum(array_column($agendaData['items'], 'duration'));
+		
+		// Calculate actual time using utility service
+		$timingData = $this->timingUtilityService->calculateCompletedActualTime($agendaData['completed_items_with_timing']);
+		
+		// Generate timing summary string using utility service (multi-line for readable summaries)
+		return $this->timingUtilityService->generateTimingSummaryString(
+			$totalPlannedMinutes,
+			$timingData['total_actual_minutes'],
+			$timingData['has_actual_time'],
+			$lang,
+			'',
+			'',
+			true, // bold formatting for meeting summaries
+			true  // multi-line format for summaries
+		);
+	}
+
 }

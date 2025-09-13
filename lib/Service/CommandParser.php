@@ -24,6 +24,7 @@ class CommandParser {
 	public const MOVE_PATTERN = '/^move\s*:\s*(\d+)\s+to\s+(\d+)$/i';
 	public const SWAP_PATTERN = '/^swap\s*:\s*(\d+),\s*(\d+)$/i';
 	public const REMOVE_PATTERN = '/^(remove|delete)\s*:\s*(\d+)$/i';
+	public const CHANGE_PATTERN = '/^change\s*:\s*(\d+)\s+(?:(?:"([^"]+)"|([^(]+?))\s*(?:\(([^)]+)\))?|\(([^)]+)\))\s*$/mi';
 	// Room-level time monitoring commands
 	public const TIME_CONFIG_PATTERN = '/^time\s+(config|status)$/i';
 	public const TIME_ENABLE_PATTERN = '/^time\s+(enable|disable)$/i';
@@ -130,6 +131,25 @@ class CommandParser {
 				'token' => $token,
 				'action' => strtolower($matches[1]),
 				'item' => (int)$matches[2]
+			];
+		}
+
+		// Change command
+		if (preg_match(self::CHANGE_PATTERN, $message, $matches)) {
+			// Handle title - can be in matches[2] (quoted) or matches[3] (unquoted)
+			$title = isset($matches[2]) && $matches[2] !== '' ? trim($matches[2]) : 
+					 (isset($matches[3]) && $matches[3] !== '' ? trim($matches[3]) : null);
+			
+			// Handle duration - can be in matches[4] (with title) or matches[5] (duration-only)
+			$duration = isset($matches[4]) && $matches[4] !== '' ? trim($matches[4]) : 
+						(isset($matches[5]) && $matches[5] !== '' ? trim($matches[5]) : null);
+			
+			return [
+				'command' => 'change',
+				'token' => $token,
+				'item' => (int)$matches[1],
+				'new_title' => $title,
+				'new_duration' => $duration
 			];
 		}
 

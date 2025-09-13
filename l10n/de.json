@@ -147,6 +147,11 @@
         "Swapped \"%s\" (pos %d) ↔ \"%s\" (pos %d)": "Punkte getauscht: \"%s\" (Pos %d) ↔ \"%s\" (Pos %d)",
         "Swap agenda items %d and %d": "Tagesordnungspunkte %d und %d tauschen",
         "Remove agenda item %d": "Tagesordnungspunkt %d entfernen",
+        "Modify agenda item title/duration": "Tagesordnungspunkt Titel/Dauer ändern",
+        "Total planned time: %s": "Gesamte geplante Zeit: %s",
+        "Total planned time:": "Gesamte geplante Zeit:",
+        "Time spent: %s": "Verbrachte Zeit: %s",
+        "Time spent:": "Verbrachte Zeit:",
         "🔒 Require moderator/owner access": "🔒 Erfordert Moderator/Besitzer-Berechtigung",
         "🔒 Advanced management commands require moderator/owner permissions": "🔒 Erweiterte Verwaltungsbefehle erfordern Moderator/Besitzer-Berechtigungen",
         "🔒 You have view-only access. Adding and managing agenda items requires higher permissions": "🔒 Sie haben nur Lesezugriff. Das Hinzufügen und Verwalten von Tagesordnungspunkten erfordert höhere Berechtigungen",
@@ -209,7 +214,16 @@
         "Warning threshold must be less than overtime threshold": "Warnschwelle muss kleiner als Überzeit-Schwelle sein",
         "Room configuration not found": "Raum-Konfiguration nicht gefunden",
         "Room time monitoring configuration": "Raum-Zeitüberwachungs-Konfiguration",
-        "Note: You can delete this welcome message if desired.": "Hinweis: Sie können diese Nachricht gerne löschen, wenn gewünscht."
+        "Note: You can delete this welcome message if desired.": "Hinweis: Sie können diese Nachricht gerne löschen, wenn gewünscht.",
+        "Please specify new title, duration, or both": "Bitte geben Sie neuen Titel, Dauer oder beides an",
+        "Cannot modify completed item %d. Use \"reopen: %d\" first": "Kann abgeschlossenen Punkt %d nicht ändern. Verwenden Sie zuerst \"reopen: %d\"",
+        "modify agenda items": "Tagesordnungspunkte ändern",
+        "title updated": "Titel aktualisiert",
+        "duration updated": "Dauer aktualisiert",
+        "Invalid duration format. Use (5 min), (1h), etc.": "Ungültiges Dauerformat. Verwenden Sie (5 Min), (1 Std), usw.",
+        "No changes made to agenda item %d": "Keine Änderungen an Tagesordnungspunkt %d vorgenommen",
+        "Modified agenda item %d: \"%s\"": "Tagesordnungspunkt %d geändert: \"%s\"",
+        "Failed to modify agenda item %d": "Fehler beim Ändern von Tagesordnungspunkt %d"
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

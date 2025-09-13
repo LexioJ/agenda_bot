@@ -37,6 +37,7 @@ class TimeMonitorService {
 		private Manager $talkManager,
 		private IFactory $l10nFactory,
 		private RoomConfigService $roomConfigService,
+		private TimingUtilityService $timingUtilityService,
 	) {
 	}
 
@@ -102,7 +103,7 @@ class TimeMonitorService {
 			return; // No planned duration
 		}
 
-	$progressRatio = $elapsedMinutes / $plannedMinutes;
+	$progressRatio = $this->timingUtilityService->calculateProgressRatio($elapsedMinutes, $plannedMinutes);
 	$config = $this->getTimeMonitoringConfig($token);
 	
 	$this->logger->debug(sprintf("TimeMonitor: Checking item %d '%s' - %.1f/%d min (%.2f ratio), thresholds: warning=%.0f%%, 100%%=100%%, overtime=%.0f%%", $itemId, $title, $elapsedMinutes, $plannedMinutes, $progressRatio, ($config['warning_threshold'] ?? self::DEFAULT_WARNING_THRESHOLD_80) * 100, ($config['overtime_threshold'] ?? self::DEFAULT_OVERTIME_THRESHOLD) * 100));

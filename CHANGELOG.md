@@ -2,6 +2,37 @@
 
 All notable changes to the Agenda Bot project will be documented in this file.
 
+## [1.3.6] - 2025-09-12
+
+### 🔧 Enhanced - Agenda Item Management
+- **`change: X` command**: New command to edit existing agenda item titles and durations
+- **Flexible syntax**: Supports changing title only, duration only, or both with natural language
+- **Validation**: Prevents modification of completed items with helpful user guidance
+- **Permission control**: Requires moderator/owner permissions for data integrity
+- **Localized**: Full support in English and German
+
+### ⚡ Enhanced - Timing System
+- **Unified timing logic**: New TimingUtilityService centralizes duration formatting and calculations
+- **Improved timing display**: Planned duration now shown immediately at call start
+- **Flexible formatting**: Compact single-line for status, multi-line for detailed summaries
+- **Consistent formatting**: Unified duration display across all features
+- **Better user experience**: Enhanced visual formatting and alignment in timing summaries
+
+### 🛠️ Technical Improvements
+- **Code organization**: Eliminated duplicate timing code across multiple services
+- **CommandParser**: Added regex patterns for modification command parsing
+- **Service integration**: TimingUtilityService properly integrated across components
+- **Translation updates**: New keys for modification features and separated timing labels
+- **Performance**: Reduced redundant calculations through shared utility methods
+- **Bug fixes**: Fixed `time reset` command error and threshold preservation in time monitoring
+
+### 📚 New Commands
+```bash
+change: 2 New title (25 min)    # Change both title and duration
+change: 3 Updated review         # Change title only  
+change: 1 (45 min)               # Change duration only
+```
+
 ## [1.3.5] - 2025-09-12
 
 ### 🔧 Enhanced - Bot Identity & User Experience
