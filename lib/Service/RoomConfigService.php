@@ -61,6 +61,35 @@ class RoomConfigService {
 	}
 	
 	/**
+	 * Get unified time monitoring configuration with proper source detection
+	 * (This is used by the config handlers)
+	 */
+	public function getTimeMonitoringConfig(string $token): array {
+		$roomConfigEntry = $this->findRoomConfigEntry($token);
+		
+		if ($roomConfigEntry) {
+			$configData = json_decode($roomConfigEntry->getDetails() ?: '{}', true);
+			$timeMonitoring = $configData['time_monitoring'] ?? null;
+			
+			// Only return room-specific config if time_monitoring section actually exists
+			if ($timeMonitoring !== null) {
+				return [
+					'enabled' => $timeMonitoring['enabled'] ?? self::DEFAULT_ENABLED,
+					'warning_threshold' => (float)($timeMonitoring['warning_threshold'] ?? self::DEFAULT_WARNING_THRESHOLD),
+					'overtime_threshold' => (float)($timeMonitoring['overtime_threshold'] ?? self::DEFAULT_OVERTIME_THRESHOLD),
+					'check_interval' => self::FIXED_CHECK_INTERVAL,
+					'source' => 'room',
+					'configured_by' => $configData['configured_by'] ?? null,
+					'configured_at' => $configData['configured_at'] ?? null,
+				];
+			}
+		}
+		
+		// Fallback to global configuration
+		return $this->getGlobalTimeMonitoringConfig();
+	}
+	
+	/**
 	 * Set room-specific time monitoring configuration
 	 */
 	public function setRoomTimeMonitoringConfig(string $token, array $config, string $userId = 'system'): void {
@@ -300,6 +329,348 @@ class RoomConfigService {
 		
 		$configData = json_decode($roomConfigEntry->getDetails() ?: '{}', true);
 		return $configData['last_summary_message_id'] ?? null;
+	}
+	
+	// Default values for new configuration areas
+	public const DEFAULT_AGENDA_LIMITS = [
+		'max_items' => 50,
+		'max_bulk_items' => 20,
+		'default_duration' => 10, // minutes
+	];
+	
+	public const DEFAULT_AUTO_BEHAVIORS = [
+		'start_agenda' => false,
+		'cleanup' => false,
+		'summary' => false,
+	];
+	
+	public const DEFAULT_EMOJIS = [
+		'current_item' => '🗣️',
+		'completed' => '✅',
+		'pending' => '📍',
+		'on_time' => '👍',
+		'time_warning' => '⏰',
+	];
+	
+	public const DEFAULT_RESPONSE_CONFIG = [
+		'response_mode' => 'normal',
+	];
+
+	/**
+	 * Get room agenda limits configuration
+	 */
+	public function getAgendaLimitsConfig(string $token): array {
+		$roomConfigEntry = $this->findRoomConfigEntry($token);
+		
+		if ($roomConfigEntry) {
+			$configData = json_decode($roomConfigEntry->getDetails() ?: '{}', true);
+			$limitsConfig = $configData['agenda_limits'] ?? null;
+			
+			if ($limitsConfig !== null) {
+				return [
+					'max_items' => $limitsConfig['max_items'] ?? self::DEFAULT_AGENDA_LIMITS['max_items'],
+					'max_bulk_items' => $limitsConfig['max_bulk_items'] ?? self::DEFAULT_AGENDA_LIMITS['max_bulk_items'],
+					'default_duration' => $limitsConfig['default_duration'] ?? self::DEFAULT_AGENDA_LIMITS['default_duration'],
+					'source' => 'room',
+					'configured_by' => $configData['configured_by'] ?? null,
+					'configured_at' => $configData['configured_at'] ?? null,
+				];
+			}
+		}
+		
+		return array_merge(self::DEFAULT_AGENDA_LIMITS, ['source' => 'global']);
+	}
+	
+	/**
+	 * Set room agenda limits configuration (partial update)
+	 */
+	public function setAgendaLimitsConfig(string $token, array $config, string $userId = 'system'): void {
+		$roomConfigEntry = $this->findRoomConfigEntry($token);
+		
+		if (!$roomConfigEntry) {
+			$roomConfigEntry = new LogEntry();
+			$roomConfigEntry->setServer('local');
+			$roomConfigEntry->setToken($token);
+			$roomConfigEntry->setType(LogEntry::TYPE_ROOM_CONFIG);
+			$existingData = [];
+		} else {
+			$existingData = json_decode($roomConfigEntry->getDetails() ?: '{}', true);
+		}
+		
+		// Get current limits config and merge with updates
+		$currentLimits = $existingData['agenda_limits'] ?? self::DEFAULT_AGENDA_LIMITS;
+		$updatedLimits = array_merge($currentLimits, $config);
+		
+		// Validate limits
+		if (isset($updatedLimits['max_items'])) {
+			$updatedLimits['max_items'] = max(5, min(100, (int)$updatedLimits['max_items']));
+		}
+		if (isset($updatedLimits['max_bulk_items'])) {
+			$updatedLimits['max_bulk_items'] = max(3, min(50, (int)$updatedLimits['max_bulk_items']));
+		}
+		if (isset($updatedLimits['default_duration'])) {
+			$updatedLimits['default_duration'] = max(1, min(120, (int)$updatedLimits['default_duration']));
+		}
+		
+		$configData = array_merge($existingData, [
+			'agenda_limits' => $updatedLimits,
+			'configured_by' => $userId,
+			'configured_at' => $this->timeFactory->now()->getTimestamp(),
+		]);
+		
+		$roomConfigEntry->setDetails(json_encode($configData, JSON_THROW_ON_ERROR));
+		
+		if ($roomConfigEntry->getId()) {
+			$this->logEntryMapper->update($roomConfigEntry);
+		} else {
+			$this->logEntryMapper->insert($roomConfigEntry);
+		}
+		
+		$this->logger->info('Updated agenda limits config for token: ' . $token, ['config' => $updatedLimits]);
+	}
+	
+	/**
+	 * Get room auto-behaviors configuration
+	 */
+	public function getAutoBehaviorsConfig(string $token): array {
+		$roomConfigEntry = $this->findRoomConfigEntry($token);
+		
+		if ($roomConfigEntry) {
+			$configData = json_decode($roomConfigEntry->getDetails() ?: '{}', true);
+			$autoConfig = $configData['auto_behaviors'] ?? null;
+			
+			if ($autoConfig !== null) {
+				return [
+					'start_agenda' => $autoConfig['start_agenda'] ?? self::DEFAULT_AUTO_BEHAVIORS['start_agenda'],
+					'cleanup' => $autoConfig['cleanup'] ?? self::DEFAULT_AUTO_BEHAVIORS['cleanup'],
+					'summary' => $autoConfig['summary'] ?? self::DEFAULT_AUTO_BEHAVIORS['summary'],
+					'source' => 'room',
+					'configured_by' => $configData['configured_by'] ?? null,
+					'configured_at' => $configData['configured_at'] ?? null,
+				];
+			}
+		}
+		
+		return array_merge(self::DEFAULT_AUTO_BEHAVIORS, ['source' => 'global']);
+	}
+	
+	/**
+	 * Set room auto-behaviors configuration (partial update)
+	 */
+	public function setAutoBehaviorsConfig(string $token, array $config, string $userId = 'system'): void {
+		$roomConfigEntry = $this->findRoomConfigEntry($token);
+		
+		if (!$roomConfigEntry) {
+			$roomConfigEntry = new LogEntry();
+			$roomConfigEntry->setServer('local');
+			$roomConfigEntry->setToken($token);
+			$roomConfigEntry->setType(LogEntry::TYPE_ROOM_CONFIG);
+			$existingData = [];
+		} else {
+			$existingData = json_decode($roomConfigEntry->getDetails() ?: '{}', true);
+		}
+		
+		// Get current auto-behaviors config and merge with updates
+		$currentAuto = $existingData['auto_behaviors'] ?? self::DEFAULT_AUTO_BEHAVIORS;
+		$updatedAuto = array_merge($currentAuto, $config);
+		
+		// Ensure boolean values
+		foreach (['start_agenda', 'cleanup', 'summary'] as $key) {
+			if (isset($updatedAuto[$key])) {
+				$updatedAuto[$key] = (bool)$updatedAuto[$key];
+			}
+		}
+		
+		$configData = array_merge($existingData, [
+			'auto_behaviors' => $updatedAuto,
+			'configured_by' => $userId,
+			'configured_at' => $this->timeFactory->now()->getTimestamp(),
+		]);
+		
+		$roomConfigEntry->setDetails(json_encode($configData, JSON_THROW_ON_ERROR));
+		
+		if ($roomConfigEntry->getId()) {
+			$this->logEntryMapper->update($roomConfigEntry);
+		} else {
+			$this->logEntryMapper->insert($roomConfigEntry);
+		}
+		
+		$this->logger->info('Updated auto-behaviors config for token: ' . $token, ['config' => $updatedAuto]);
+	}
+	
+	/**
+	 * Get room custom emojis configuration
+	 */
+	public function getEmojisConfig(string $token): array {
+		$roomConfigEntry = $this->findRoomConfigEntry($token);
+		
+		if ($roomConfigEntry) {
+			$configData = json_decode($roomConfigEntry->getDetails() ?: '{}', true);
+			$emojisConfig = $configData['custom_emojis'] ?? null;
+			
+			if ($emojisConfig !== null) {
+				return [
+					'current_item' => $emojisConfig['current_item'] ?? self::DEFAULT_EMOJIS['current_item'],
+					'completed' => $emojisConfig['completed'] ?? self::DEFAULT_EMOJIS['completed'],
+					'pending' => $emojisConfig['pending'] ?? self::DEFAULT_EMOJIS['pending'],
+					'on_time' => $emojisConfig['on_time'] ?? self::DEFAULT_EMOJIS['on_time'],
+					'time_warning' => $emojisConfig['time_warning'] ?? self::DEFAULT_EMOJIS['time_warning'],
+					'source' => 'room',
+					'configured_by' => $configData['configured_by'] ?? null,
+					'configured_at' => $configData['configured_at'] ?? null,
+				];
+			}
+		}
+		
+		return array_merge(self::DEFAULT_EMOJIS, ['source' => 'global']);
+	}
+	
+	/**
+	 * Set room custom emojis configuration (partial update)
+	 */
+	public function setEmojisConfig(string $token, array $config, string $userId = 'system'): void {
+		$roomConfigEntry = $this->findRoomConfigEntry($token);
+		
+		if (!$roomConfigEntry) {
+			$roomConfigEntry = new LogEntry();
+			$roomConfigEntry->setServer('local');
+			$roomConfigEntry->setToken($token);
+			$roomConfigEntry->setType(LogEntry::TYPE_ROOM_CONFIG);
+			$existingData = [];
+		} else {
+			$existingData = json_decode($roomConfigEntry->getDetails() ?: '{}', true);
+		}
+		
+		// Get current emojis config and merge with updates
+		$currentEmojis = $existingData['custom_emojis'] ?? self::DEFAULT_EMOJIS;
+		$updatedEmojis = array_merge($currentEmojis, $config);
+		
+		// Validate emojis
+		foreach ($updatedEmojis as $key => $emoji) {
+			if (is_string($emoji)) {
+				$emoji = trim($emoji);
+				if (empty($emoji) || mb_strlen($emoji) > 10) {
+					$updatedEmojis[$key] = self::DEFAULT_EMOJIS[$key] ?? '🔴';
+				} else {
+					$updatedEmojis[$key] = $emoji;
+				}
+			}
+		}
+		
+		$configData = array_merge($existingData, [
+			'custom_emojis' => $updatedEmojis,
+			'configured_by' => $userId,
+			'configured_at' => $this->timeFactory->now()->getTimestamp(),
+		]);
+		
+		$roomConfigEntry->setDetails(json_encode($configData, JSON_THROW_ON_ERROR));
+		
+		if ($roomConfigEntry->getId()) {
+			$this->logEntryMapper->update($roomConfigEntry);
+		} else {
+			$this->logEntryMapper->insert($roomConfigEntry);
+		}
+		
+		$this->logger->info('Updated custom emojis config for token: ' . $token, ['config' => $updatedEmojis]);
+	}
+	
+	/**
+	 * Get room response configuration
+	 */
+	public function getResponseConfig(string $token): array {
+		$roomConfigEntry = $this->findRoomConfigEntry($token);
+		
+		if ($roomConfigEntry) {
+			$configData = json_decode($roomConfigEntry->getDetails() ?: '{}', true);
+			$responseConfig = $configData['response_settings'] ?? null;
+			
+			if ($responseConfig !== null) {
+				return [
+					'response_mode' => $responseConfig['response_mode'] ?? self::DEFAULT_RESPONSE_CONFIG['response_mode'],
+					'source' => 'room',
+					'configured_by' => $configData['configured_by'] ?? null,
+					'configured_at' => $configData['configured_at'] ?? null,
+				];
+			}
+		}
+		
+		return array_merge(self::DEFAULT_RESPONSE_CONFIG, ['source' => 'global']);
+	}
+	
+	/**
+	 * Set room response configuration (partial update)
+	 */
+	public function setResponseConfig(string $token, array $config, string $userId = 'system'): void {
+		$roomConfigEntry = $this->findRoomConfigEntry($token);
+		
+		if (!$roomConfigEntry) {
+			$roomConfigEntry = new LogEntry();
+			$roomConfigEntry->setServer('local');
+			$roomConfigEntry->setToken($token);
+			$roomConfigEntry->setType(LogEntry::TYPE_ROOM_CONFIG);
+			$existingData = [];
+		} else {
+			$existingData = json_decode($roomConfigEntry->getDetails() ?: '{}', true);
+		}
+		
+		// Get current response config and merge with updates
+		$currentResponse = $existingData['response_settings'] ?? self::DEFAULT_RESPONSE_CONFIG;
+		$updatedResponse = array_merge($currentResponse, $config);
+		
+		// Validate response mode
+		if (isset($updatedResponse['response_mode'])) {
+			if (!in_array($updatedResponse['response_mode'], ['normal', 'minimal'], true)) {
+				$updatedResponse['response_mode'] = 'normal';
+			}
+		}
+		
+		$configData = array_merge($existingData, [
+			'response_settings' => $updatedResponse,
+			'configured_by' => $userId,
+			'configured_at' => $this->timeFactory->now()->getTimestamp(),
+		]);
+		
+		$roomConfigEntry->setDetails(json_encode($configData, JSON_THROW_ON_ERROR));
+		
+		if ($roomConfigEntry->getId()) {
+			$this->logEntryMapper->update($roomConfigEntry);
+		} else {
+			$this->logEntryMapper->insert($roomConfigEntry);
+		}
+		
+		$this->logger->info('Updated response config for token: ' . $token, ['config' => $updatedResponse]);
+	}
+
+	/**
+	 * Reset response configuration to global defaults
+	 */
+	public function resetResponseConfig(string $token): bool {
+		$roomConfigEntry = $this->findRoomConfigEntry($token);
+		
+		if (!$roomConfigEntry) {
+			return false; // No config to reset
+		}
+		
+		$configData = json_decode($roomConfigEntry->getDetails() ?: '{}', true);
+		
+		// Remove response_settings section if it exists
+		if (!isset($configData['response_settings'])) {
+			return false; // No response config to reset
+		}
+		
+		unset($configData['response_settings']);
+		
+		// If config is now empty (only metadata), delete the entire entry
+		if (empty(array_diff_key($configData, ['configured_by', 'configured_at', 'language', 'language_updated_at', 'last_summary_message_id', 'last_summary_timestamp']))) {
+			$this->logEntryMapper->delete($roomConfigEntry);
+		} else {
+			// Update config without response_settings section
+			$roomConfigEntry->setDetails(json_encode($configData, JSON_THROW_ON_ERROR));
+			$this->logEntryMapper->update($roomConfigEntry);
+		}
+		
+		$this->logger->info('Reset response config for token: ' . $token);
+		return true;
 	}
 	
 	/**
