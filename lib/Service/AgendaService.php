@@ -1032,9 +1032,9 @@ class AgendaService {
 					 "**" . $l->t('Time Formats:') . "** `(5 m)`, `(10 min)`, `(1h)`, `(2 hours)`, `(90 min)`\n\n";
 		}
 		
-		// Time monitoring - available to all users for viewing
-		$help .= "**" . $l->t('Time Monitoring:') . "**\n" .
-				 "• `time config` - " . $l->t('Show time monitoring configuration') . "\n";
+		// Room Configuration - available to all users for viewing
+		$help .= "**" . $l->t('Room Configuration:') . "**\n" .
+				 "• `config show` - " . $l->t('Show complete room configuration overview') . "\n";
 		
 		// Full moderator commands for types 1,2,6 (Owner, Moderator, Guest with moderator permissions)
 		if ($isModerator) {

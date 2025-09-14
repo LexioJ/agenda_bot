@@ -1,12 +1,16 @@
 # Room-Level Time Monitoring
 
-This document describes the room-level time monitoring feature in Agenda Bot v1.2.0, which allows per-room configuration of time tracking settings while maintaining backward compatibility with global settings.
+⚡ **Enhanced in v1.4.0** with unified `config time` commands as part of the comprehensive Room-Level Bot Configuration system.
 
-## Overview
+This document describes the room-level time monitoring feature, which allows per-room configuration of time tracking settings while maintaining backward compatibility with global settings.
+
+## Overview ⚡ Enhanced in v1.4.0
 
 Room-level time monitoring enables different Talk rooms to have their own time tracking configurations, overriding the global defaults when needed. This is particularly useful for organizations with different meeting types that require different time management approaches.
 
-### Key Features
+**New in v1.4.0**: Time monitoring is now part of the unified Room-Level Bot Configuration system, offering seamless integration with response modes, agenda limits, auto-behaviors, and custom emojis through consistent `config time` commands.
+
+### Key Features ⚡ Enhanced in v1.4.0
 
 - **Room-specific configuration**: Each Talk room can have its own time monitoring settings
 - **Global fallback**: Rooms without specific configuration use global defaults
@@ -14,6 +18,10 @@ Room-level time monitoring enables different Talk rooms to have their own time t
 - **Backward compatibility**: Existing deployments continue working with global settings
 - **Dynamic enabling/disabling**: Time monitoring can be enabled or disabled per room
 - **Custom thresholds**: Warning and overtime thresholds can be set per room
+- **🎆 New in v1.4.0**: Unified `config time` commands for consistency with other room settings
+- **🎆 New in v1.4.0**: Integration with complete room configuration system (`config show`)
+- **🎆 New in v1.4.0**: Enhanced language support for background job warnings
+- **🎆 New in v1.4.0**: Metadata tracking (who configured, when) for all settings
 
 ## Architecture
 
@@ -41,44 +49,60 @@ Room configurations are stored as entries in the existing `oc_ab_log_entries` ta
 - 🔄 **Backward compatible** - Existing setups unaffected
 - ⚡ **Efficient queries** - Existing indexes support the pattern
 
-## User Interface
+## User Interface ⚡ Enhanced in v1.4.0
 
-### Available Commands
+### Unified Configuration Commands (v1.4.0+) 🎆 New
+
+Time monitoring is now part of the unified Room-Level Bot Configuration system:
+
+#### Primary Configuration Commands
+```
+config show                    # Shows complete room configuration including time monitoring
+config time help              # Shows time monitoring specific help and examples
+config time enable|disable    # Enable/disable time monitoring for this room
+config time thresholds X Y    # Set warning thresholds (e.g., 0.8 1.0 for 80% and 100%)
+config time overtime X        # Set overtime warning threshold (e.g., 1.2 for 120%)
+config time reset             # Reset all time monitoring settings to defaults
+```
+
+### Legacy Commands (Deprecated but supported)
+
+These original commands still work but are superseded by the unified `config time` commands:
 
 #### View Configuration
 ```
-time config
+time config                   # Use: config show (shows all room config)
 ```
 Shows current time monitoring configuration for the room, indicating whether it's using global defaults or room-specific settings.
 
 #### Enable/Disable Monitoring
 ```
-time enable
-time disable
+time enable                   # Use: config time enable
+time disable                  # Use: config time disable
 ```
 Enables or disables time monitoring for the specific room.
 
 #### Set Warning Threshold
 ```
-time warning 75
+time warning 75               # Use: config time warning 75
 ```
 Sets the first warning threshold to 75% of planned time for the room.
 
 #### Set Overtime Threshold
 ```
-time overtime 110
+time overtime 110             # Use: config time overtime 110
 ```
 Sets the overtime alert threshold to 110% of planned time for the room.
 
 #### Set Both Thresholds
 ```
-time thresholds 80 120
+time thresholds 80 120        # Use: config time thresholds 80 120
 ```
 Sets both warning (80%) and overtime (120%) thresholds in one command.
 
 #### Reset to Global Defaults
 ```
-time reset
+time reset                    # Use: config time reset
 ```
 Removes room-specific configuration, causing the room to fall back to global defaults.
 
@@ -86,9 +110,27 @@ Removes room-specific configuration, causing the room to fall back to global def
 
 All room-level time monitoring commands require **moderator or owner** permissions in the Talk room.
 
-## Configuration Examples
+## Configuration Examples ⚡ Enhanced in v1.4.0
 
-### Global Default Configuration
+### Complete Room Configuration Display (v1.4.0+)
+```
+config show
+```
+Response:
+```
+**Room Configuration Overview**
+
+**1. Time Monitoring** ⏱️
+✅ Time monitoring is currently enabled for this room.
+⚠️ Warning thresholds: 80% and 100%
+🚨 Overtime warning at 120%
+Configured by @alice on 2024-01-15 14:30
+
+**2. Response Mode** 💬
+[Additional configuration areas shown...]
+```
+
+### Legacy Time-Only Configuration Display
 ```
 time config
 ```
@@ -102,28 +144,16 @@ Response:
 • Time checks run every 5 minutes with Nextcloud's background jobs
 ```
 
-### Room-Specific Configuration
+### Setting Custom Thresholds (v1.4.0+)
 ```
-time config
+# New unified command
+config time thresholds 70 110
 ```
 Response:
 ```
-🕒 Room Time Monitoring
-• Status: ✅ Enabled
-• First warning at 60%
-• Overtime alert at 110%
-• Configured by: john.doe on 2025-01-01 15:30
-• Moderators/Owners can configure room-specific time monitoring
+✅ Time monitoring thresholds updated: warnings at 70% and 110%
 ```
 
-### Setting Custom Thresholds
-```
-time thresholds 70 110
-```
-Response:
-```
-✅ Thresholds updated: warning at 70%, overtime at 110%
-```
 
 ## Technical Implementation
 

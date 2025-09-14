@@ -770,6 +770,38 @@ class RoomConfigService {
 	}
 	
 	/**
+	 * Reset time monitoring configuration to global defaults
+	 */
+	public function resetTimeMonitoringConfig(string $token): bool {
+		$roomConfigEntry = $this->findRoomConfigEntry($token);
+		
+		if (!$roomConfigEntry) {
+			return false; // No config to reset
+		}
+		
+		$configData = json_decode($roomConfigEntry->getDetails() ?: '{}', true);
+		
+		// Remove time_monitoring section if it exists
+		if (!isset($configData['time_monitoring'])) {
+			return false; // No time monitoring config to reset
+		}
+		
+		unset($configData['time_monitoring']);
+		
+		// If config is now empty (only metadata), delete the entire entry
+		if (empty(array_diff_key($configData, ['configured_by', 'configured_at', 'language', 'language_updated_at', 'last_summary_message_id', 'last_summary_timestamp']))) {
+			$this->logEntryMapper->delete($roomConfigEntry);
+		} else {
+			// Update config without time_monitoring section
+			$roomConfigEntry->setDetails(json_encode($configData, JSON_THROW_ON_ERROR));
+			$this->logEntryMapper->update($roomConfigEntry);
+		}
+		
+		$this->logger->info('Reset time monitoring config for token: ' . $token);
+		return true;
+	}
+	
+	/**
 	 * Get room configuration metadata (who configured it, when)
 	 */
 	public function getRoomConfigMetadata(string $token): ?array {

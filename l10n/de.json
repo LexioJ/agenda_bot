@@ -208,7 +208,8 @@
         "Room time monitoring reset to global defaults": "Raum-Zeitüberwachung auf Standardwerte zurückgesetzt",
         "Invalid threshold value. Must be between %d%% and %d%%": "Ungültiger Schwellenwert. Muss zwischen %d%% und %d%% liegen",
         "Warning threshold must be less than overtime threshold": "Warnschwelle muss kleiner als Überzeit-Schwelle sein",
-        "Room configuration not found": "Raum-Konfiguration nicht gefunden",
+        "Room configuration not found": "Raumkonfiguration nicht gefunden",
+        "No time monitoring configuration found": "Keine Zeitüberwachungskonfiguration gefunden",
         "Room time monitoring configuration": "Raum-Zeitüberwachungs-Konfiguration",
         "Note: You can delete this welcome message if desired.": "Hinweis: Sie können diese Nachricht gerne löschen, wenn gewünscht.",
         "Please specify new title, duration, or both": "Bitte geben Sie neuen Titel, Dauer oder beides an",
@@ -373,7 +374,9 @@
         "• Complete current: `done`": "• Aktuellen abschließen: `done`",
         "• Complete specific: `agenda complete 3`": "• Spezifischen abschließen: `agenda complete 3`",
         "• Get help: `agenda help`": "• Hilfe erhalten: `agenda help`",
-        "• Set current: `agenda next 2`": "• Aktuellen setzen: `agenda next 2`"
+        "• Set current: `agenda next 2`": "• Aktuellen setzen: `agenda next 2`",
+        "Show complete room configuration overview": "Vollständige Raum-Konfigurationsübersicht anzeigen",
+        "Room Configuration:": "Raum-Konfiguration:"
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

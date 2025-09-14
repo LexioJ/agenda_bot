@@ -216,6 +216,7 @@
         "Invalid threshold value. Must be between %d%% and %d%%": "Invalid threshold value. Must be between %d%% and %d%%",
         "Warning threshold must be less than overtime threshold": "Warning threshold must be less than overtime threshold",
         "Room configuration not found": "Room configuration not found",
+        "No time monitoring configuration found": "No time monitoring configuration found",
         "Room time monitoring configuration": "Room time monitoring configuration",
         "Note: You can delete this welcome message if desired.": "Note: You can delete this welcome message if desired.",
         "Hi there! I'm your agenda assistant": "Hi there! I'm your agenda assistant",
@@ -341,7 +342,9 @@
         "• Complete current: `done`": "• Complete current: `done`",
         "• Complete specific: `agenda complete 3`": "• Complete specific: `agenda complete 3`",
         "• Get help: `agenda help`": "• Get help: `agenda help`",
-        "• Set current: `agenda next 2`": "• Set current: `agenda next 2`"
+        "• Set current: `agenda next 2`": "• Set current: `agenda next 2`",
+        "Show complete room configuration overview": "Show complete room configuration overview",
+        "Room Configuration:": "Room Configuration:"
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

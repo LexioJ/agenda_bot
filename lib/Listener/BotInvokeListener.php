@@ -464,7 +464,7 @@ class BotInvokeListener implements IEventListener {
 				return $result['message'];
 
 			case 'time_reset':
-				// Reset room config by deleting it (will fallback to global config)
+				// Reset time monitoring config only (not entire room config)
 				$l = $this->l10nFactory->get(Application::APP_ID, $lang);
 				
 				// Check moderator permissions
@@ -472,12 +472,12 @@ class BotInvokeListener implements IEventListener {
 					return $this->permissionService->getPermissionDeniedMessage($l->t('configure time monitoring settings'), $lang);
 				}
 				
-				// Call reset method via RoomConfigService
-				$reset = $this->roomConfigService->resetRoomConfig($command['token']);
+				// Call specific time monitoring reset method
+				$reset = $this->roomConfigService->resetTimeMonitoringConfig($command['token']);
 				if ($reset) {
 					return '✅ ' . $l->t('Room time monitoring reset to global defaults');
 				} else {
-					return 'ℹ️ ' . $l->t('Room configuration not found') . ' - ' . $l->t('This room is using global defaults. Use time commands to set room-specific configuration.');
+					return 'ℹ️ ' . $l->t('No time monitoring configuration found') . ' - ' . $l->t('This room is using global defaults. Use time commands to set room-specific configuration.');
 				}
 
 			case 'cleanup':
@@ -978,11 +978,11 @@ class BotInvokeListener implements IEventListener {
 				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
 					return $this->permissionService->getPermissionDeniedMessage($l->t('configure time monitoring settings'), $lang);
 				}
-				$resetSuccess = $this->roomConfigService->resetRoomConfig($token);
+				$resetSuccess = $this->roomConfigService->resetTimeMonitoringConfig($token);
 				if ($resetSuccess) {
 					return "✅ " . $l->t('Time monitoring reset to global defaults');
 				} else {
-					return "ℹ️ " . $l->t('Room configuration not found') . " - " . $l->t('Using global defaults');
+					return "ℹ️ " . $l->t('No time monitoring configuration found') . " - " . $l->t('Using global defaults');
 				}
 				
 			default:

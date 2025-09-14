@@ -2,6 +2,163 @@
 
 All notable changes to the Agenda Bot project will be documented in this file.
 
+## [1.4.0] - 2025-09-14
+
+### 🚀 Added - Room-Level Bot Configuration
+
+Each Talk room can now have its own unique bot configuration across five comprehensive areas:
+
+#### ⚙️ **Unified Configuration System**
+- **New `config show` command**: Display complete room configuration overview in a beautiful, organized format
+- **Hierarchical configuration**: Room-specific settings override global defaults with intelligent fallback
+- **Configuration metadata**: Track who configured what, when, with full audit trail
+- **Atomic updates**: Partial configuration updates preserve existing settings
+- **Smart reset functionality**: Individual sections can be reset to global defaults
+
+#### 🕙 **Enhanced Time Monitoring Configuration**
+- **`config time` command suite**: Unified interface for all time monitoring settings
+- **Room-specific thresholds**: Custom warning (10-95%) and overtime (105-300%) percentages
+- **`config time enable/disable`**: Toggle monitoring per room without affecting other rooms
+- **`config time warning X`**: Set warning threshold (e.g., `config time warning 75`)
+- **`config time overtime X`**: Set overtime threshold (e.g., `config time overtime 110`) 
+- **`config time thresholds X Y`**: Set both thresholds in one command
+- **`config time reset`**: Return to global defaults
+- **Backward compatibility**: Existing `time xxx` commands remain fully functional
+
+#### 💬 **Response Behavior Configuration**  
+- **`config response` command suite**: Control bot verbosity and notification levels
+- **Normal mode**: Full text responses for all commands and operations
+- **Minimal mode**: Emoji reactions only, reducing notifications while preserving functionality
+- **Smart exceptions**: Help, status, and critical notifications always use text in minimal mode
+- **`config response normal/minimal`**: Switch between response modes
+- **`config response reset`**: Return to global response defaults
+
+#### 🚧 **Agenda Limits Configuration**
+- **`config limits` command suite**: Fine-tune agenda capacity and behavior limits
+- **`config limits max-items X`**: Set maximum total agenda items (5-100)
+- **`config limits max-bulk X`**: Set maximum bulk operation size (3-50) 
+- **`config limits default-duration X`**: Set default item duration in minutes (1-120)
+- **`config limits reset`**: Reset all limits to global defaults
+- **Validation**: All limits validated with sensible bounds to prevent abuse
+
+#### 🤖 **Auto-behaviors Configuration**
+- **`config auto` command suite**: Control automatic bot behaviors during meetings
+- **`config auto start-agenda enable/disable`**: Auto-set first agenda item as current on call start
+- **`config auto cleanup enable/disable`**: Automatically remove completed items after meetings
+- **`config auto summary enable/disable`**: Generate meeting summaries on call end
+- **`config auto reset`**: Reset all auto-behaviors to global defaults
+- **Meeting flow optimization**: Enhances natural meeting progression
+
+#### 😀 **Custom Emojis Configuration**
+- **`config emojis` command suite**: Personalize visual agenda item indicators
+- **`config emojis current-item 🎯`**: Set emoji for current agenda item
+- **`config emojis completed 🎉`**: Set emoji for completed items
+- **`config emojis pending 📋`**: Set emoji for pending items  
+- **`config emojis on-time 👌`**: Set emoji for on-time status indicators
+- **`config emojis time-warning ⚠️`**: Set emoji for time warnings
+- **`config emojis reset`**: Reset to global emoji defaults
+- **Validation**: Emoji length limits and fallback to defaults for invalid entries
+
+### 🛠️ Technical Architecture Enhancements
+
+#### **RoomConfigService Expansion**
+- **Five new configuration areas**: Complete CRUD operations for each configuration type
+- **Intelligent data merging**: Partial updates preserve existing configuration sections
+- **Metadata management**: Comprehensive tracking of configuration changes with timestamps
+- **Smart cleanup**: Automatic removal of empty configuration entries
+- **Method standardization**: Consistent `getXxxConfig()`, `setXxxConfig()`, `resetXxxConfig()` patterns
+
+#### **CommandParser Extensions** 
+- **37 new command patterns**: Comprehensive regex patterns for all configuration commands
+- **Flexible parameter handling**: Support for optional parameters and multiple command formats
+- **Unified parsing**: Consistent command structure across all configuration areas
+- **Error resilience**: Graceful handling of malformed commands with helpful feedback
+
+#### **BotInvokeListener Enhancements**
+- **5 new command handlers**: `handleConfigShow`, `handleConfigTime`, `handleConfigResponse`, `handleConfigLimits`, `handleConfigAuto`, `handleConfigEmojis`
+- **Permission integration**: All configuration commands respect moderator/owner permissions
+- **Localization support**: Complete translation integration for all new features
+- **User ID extraction**: Robust actor data processing for audit trails
+
+### 📚 **Comprehensive Documentation**
+- **Interactive help system**: All new commands integrated into `agenda help` with examples
+- **Contextual guidance**: Each configuration area provides usage examples and tips
+- **Permission indicators**: Clear indication of required permission levels
+- **Visual formatting**: Beautiful markdown formatting with emojis and structured layout
+
+### 🌍 **Complete Localization Support**
+- **English translations**: 150+ new translation keys for all configuration features
+- **German translations**: Complete German localization for all new functionality  
+- **Translation consistency**: Standardized terminology across all configuration areas
+- **Dynamic pluralization**: Proper plural forms for counts and statistics
+- **Cultural adaptation**: Region-appropriate formatting and language patterns
+
+### 🔒 **Security & Permission Framework**
+- **Moderator/Owner restrictions**: All configuration changes require appropriate permissions
+- **Permission validation**: Comprehensive checks before any configuration modifications
+- **Audit trail**: Complete logging of all configuration changes with user attribution
+- **Data validation**: Input sanitization and bounds checking for all configuration values
+- **Graceful degradation**: Non-privileged users see appropriate permission denied messages
+
+### ⚡ **Performance & Reliability**
+- **Efficient storage**: JSON-based configuration storage with minimal overhead
+- **Intelligent caching**: Configuration values cached and loaded on-demand
+- **Atomic operations**: Database transactions ensure configuration consistency
+- **Graceful fallbacks**: Robust handling of missing or corrupted configuration data
+- **Memory optimization**: Lightweight configuration objects with efficient serialization
+
+### 🎯 **User Experience Improvements**
+- **Intuitive command structure**: Logical, consistent command hierarchy across all areas
+- **Rich visual feedback**: Comprehensive status displays with emojis and formatting
+- **Context-aware help**: Relevant examples and usage tips for each configuration area
+- **Error recovery**: Clear error messages with suggestions for valid alternatives
+- **Progressive disclosure**: Basic commands with optional advanced parameters
+
+### 🔧 **Migration & Compatibility**
+- **Zero-disruption upgrade**: Existing installations continue working without changes
+- **Backward compatibility**: All existing commands and behaviors preserved
+- **Gradual adoption**: Rooms can adopt new configuration features as needed
+- **Global defaults**: Unchanged global settings serve as fallback for all rooms
+- **Legacy support**: Old `time xxx` commands remain fully functional alongside new `config` suite
+
+### 📊 **Configuration Examples**
+
+**Complete room setup for focused meetings:**
+```bash
+config time thresholds 70 110        # Tighter time management
+config response minimal              # Reduce notification noise  
+config limits default-duration 15    # Longer default discussions
+config auto start-agenda enable      # Auto-start on call begin
+config emojis current-item 🎯        # Focused meeting aesthetic
+```
+
+**Quick team standup configuration:**
+```bash
+config limits max-items 10           # Limit agenda size
+config limits default-duration 3     # Short discussion items
+config auto cleanup enable           # Auto-remove completed items
+config response minimal              # Minimal distractions
+```
+
+**Executive boardroom setup:**
+```bash
+config time warning 85               # Conservative time warnings
+config auto summary enable           # Automatic meeting summaries
+config limits max-bulk 5             # Controlled agenda imports
+config emojis completed ✅           # Professional appearance
+```
+
+### 🎉 **Impact Summary**
+
+Version 1.4.0 represents the largest single enhancement in Agenda Bot history, introducing:
+- **5 comprehensive configuration areas** with 25+ individual settings
+- **37 new commands** for complete customization control
+- **200+ new translation keys** across English and German
+- **500+ lines** of new service methods and command handlers
+- **Complete backward compatibility** ensuring seamless upgrades
+
+This release transforms Agenda Bot from a useful meeting tool into a highly personalized, room-specific assistant that adapts to each team's unique meeting culture and requirements.
+
 ## [1.3.6] - 2025-09-12
 
 ### 🔧 Enhanced - Agenda Item Management
