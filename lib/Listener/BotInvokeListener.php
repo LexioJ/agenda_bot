@@ -631,7 +631,7 @@ class BotInvokeListener implements IEventListener {
 		$output .= "💡 Use `config emojis` for custom emojis configuration help\n";
 		
 		$output .= "\n---\n";
-		$output .= "🔧 Use `config time`, `config response`, `config limits`, `config auto`, or `config emojis` for detailed configuration help\n";
+		$output .= "🔒 " . $l->t('Only moderators and owners can modify room configuration') . "\n";
 		
 		return $output;
 	}
@@ -652,6 +652,22 @@ class BotInvokeListener implements IEventListener {
 				$output .= "• **" . $l->t('Max total items') . "**: " . $limitsConfig['max_items'] . " " . $l->t('items') . "\n";
 				$output .= "• **" . $l->t('Max bulk operation') . "**: " . $limitsConfig['max_bulk_items'] . " " . $l->t('items') . "\n";
 				$output .= "• **" . $l->t('Default item duration') . "**: " . $limitsConfig['default_duration'] . " " . $l->t('minutes') . "\n";
+				
+				if ($limitsConfig['source'] === 'room' && ($limitsConfig['configured_by'] ?? null)) {
+					$configDate = date('Y-m-d H:i', $limitsConfig['configured_at'] ?? time());
+					$output .= "• **" . $l->t('Configured by') . "**: " . $limitsConfig['configured_by'] . " (" . $configDate . ")\n";
+				} else {
+					$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Global defaults') . "\n";
+				}
+				
+				$output .= "\n---\n";
+				$output .= "💡 **" . $l->t('Available Commands') . ":**\n";
+				$output .= "• `config limits max-items 30` — " . $l->t('Set maximum total agenda items (5-100)') . "\n";
+				$output .= "• `config limits max-bulk 15` — " . $l->t('Set maximum bulk operation items (3-50)') . "\n";
+				$output .= "• `config limits default-duration 15` — " . $l->t('Set default item duration in minutes (1-120)') . "\n";
+				$output .= "• `config limits reset` — " . $l->t('Reset limits to global defaults') . "\n";
+				$output .= "\n🔒 " . $l->t('Only moderators/owners can change agenda limits') . "\n";
+				
 				return $output;
 				
 			case 'max-items':
@@ -712,11 +728,33 @@ class BotInvokeListener implements IEventListener {
 		
 		switch ($action) {
 			case 'show':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('view detailed auto-behaviors configuration'), $lang);
+				}
 				$autoConfig = $this->roomConfigService->getAutoBehaviorsConfig($token);
 				$output = "### 🤖 " . $l->t('Auto-behaviors Configuration') . "\n\n";
 				$output .= "• **" . $l->t('Start agenda on call') . "**: " . ($autoConfig['start_agenda'] ? "✅ " . $l->t('Enabled') : "❌ " . $l->t('Disabled')) . "\n";
 				$output .= "• **" . $l->t('Auto-cleanup completed') . "**: " . ($autoConfig['cleanup'] ? "✅ " . $l->t('Enabled') : "❌ " . $l->t('Disabled')) . "\n";
 				$output .= "• **" . $l->t('Generate summaries') . "**: " . ($autoConfig['summary'] ? "✅ " . $l->t('Enabled') : "❌ " . $l->t('Disabled')) . "\n";
+				
+				if ($autoConfig['source'] === 'room' && ($autoConfig['configured_by'] ?? null)) {
+					$configDate = date('Y-m-d H:i', $autoConfig['configured_at'] ?? time());
+					$output .= "• **" . $l->t('Configured by') . "**: " . $autoConfig['configured_by'] . " (" . $configDate . ")\n";
+				} else {
+					$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Global defaults') . "\n";
+				}
+				
+				$output .= "\n---\n";
+				$output .= "💡 **" . $l->t('Available Commands') . ":**\n";
+				$output .= "• `config auto start-agenda enable` — " . $l->t('Auto-set first item as current on call start') . "\n";
+				$output .= "• `config auto start-agenda disable` — " . $l->t('Disable auto-start agenda behavior') . "\n";
+				$output .= "• `config auto cleanup enable` — " . $l->t('Auto-remove completed items') . "\n";
+				$output .= "• `config auto cleanup disable` — " . $l->t('Disable auto-cleanup behavior') . "\n";
+				$output .= "• `config auto summary enable` — " . $l->t('Generate summaries on call end') . "\n";
+				$output .= "• `config auto summary disable` — " . $l->t('Disable automatic summary generation') . "\n";
+				$output .= "• `config auto reset` — " . $l->t('Reset auto-behaviors to global defaults') . "\n";
+				$output .= "\n🔒 " . $l->t('Only moderators/owners can change auto-behaviors') . "\n";
+				
 				return $output;
 				
 			case 'start-agenda':
@@ -767,6 +805,9 @@ class BotInvokeListener implements IEventListener {
 		
 		switch ($action) {
 			case 'show':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('view detailed emojis configuration'), $lang);
+				}
 				$emojisConfig = $this->roomConfigService->getEmojisConfig($token);
 				$output = "### 😀 " . $l->t('Custom Emojis Configuration') . "\n\n";
 				$output .= "• **" . $l->t('Current agenda item') . "**: " . $emojisConfig['current_item'] . "\n";
@@ -774,6 +815,24 @@ class BotInvokeListener implements IEventListener {
 				$output .= "• **" . $l->t('Pending agenda item') . "**: " . $emojisConfig['pending'] . "\n";
 				$output .= "• **" . $l->t('On time icon') . "**: " . $emojisConfig['on_time'] . "\n";
 				$output .= "• **" . $l->t('Time warning icon') . "**: " . $emojisConfig['time_warning'] . "\n";
+				
+				if ($emojisConfig['source'] === 'room' && ($emojisConfig['configured_by'] ?? null)) {
+					$configDate = date('Y-m-d H:i', $emojisConfig['configured_at'] ?? time());
+					$output .= "• **" . $l->t('Configured by') . "**: " . $emojisConfig['configured_by'] . " (" . $configDate . ")\n";
+				} else {
+					$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Global defaults') . "\n";
+				}
+				
+				$output .= "\n---\n";
+				$output .= "💡 **" . $l->t('Available Commands') . ":**\n";
+				$output .= "• `config emojis current-item 🎯` — " . $l->t('Set emoji for current agenda item') . "\n";
+				$output .= "• `config emojis completed ✔️` — " . $l->t('Set emoji for completed items') . "\n";
+				$output .= "• `config emojis pending ⏳` — " . $l->t('Set emoji for pending items') . "\n";
+				$output .= "• `config emojis on-time 👌` — " . $l->t('Set emoji for on-time status') . "\n";
+				$output .= "• `config emojis time-warning ⚠️` — " . $l->t('Set emoji for time warnings') . "\n";
+				$output .= "• `config emojis reset` — " . $l->t('Reset emojis to global defaults') . "\n";
+				$output .= "\n🔒 " . $l->t('Only moderators/owners can change custom emojis') . "\n";
+				
 				return $output;
 				
 			case 'set':
@@ -819,11 +878,32 @@ class BotInvokeListener implements IEventListener {
 		
 		switch ($action) {
 			case 'show':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('view detailed time monitoring configuration'), $lang);
+				}
 				$timeConfig = $this->roomConfigService->getTimeMonitoringConfig($token);
 				$output = "### 🕙 " . $l->t('Time Monitoring Configuration') . "\n\n";
 				$output .= "• **" . $l->t('Status') . "**: " . ($timeConfig['enabled'] ? "✅ " . $l->t('Enabled') : "❌ " . $l->t('Disabled')) . "\n";
 				$output .= "• **" . $l->t('Warning threshold') . "**: " . round($timeConfig['warning_threshold'] * 100) . "% " . $l->t('of planned time') . "\n";
 				$output .= "• **" . $l->t('Overtime threshold') . "**: " . round($timeConfig['overtime_threshold'] * 100) . "% " . $l->t('of planned time') . "\n";
+				
+				if ($timeConfig['source'] === 'room' && ($timeConfig['configured_by'] ?? null)) {
+					$configDate = date('Y-m-d H:i', $timeConfig['configured_at'] ?? time());
+					$output .= "• **" . $l->t('Configured by') . "**: " . $timeConfig['configured_by'] . " (" . $configDate . ")\n";
+				} else {
+					$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Global defaults') . "\n";
+				}
+				
+				$output .= "\n---\n";
+				$output .= "💡 **" . $l->t('Available Commands') . ":**\n";
+				$output .= "• `config time enable` — " . $l->t('Enable time monitoring for this room') . "\n";
+				$output .= "• `config time disable` — " . $l->t('Disable time monitoring for this room') . "\n";
+				$output .= "• `config time warning 75` — " . $l->t('Set warning at 75% of planned time') . "\n";
+				$output .= "• `config time overtime 120` — " . $l->t('Set overtime alert at 120% of planned time') . "\n";
+				$output .= "• `config time thresholds 75 120` — " . $l->t('Set both warning and overtime thresholds') . "\n";
+				$output .= "• `config time reset` — " . $l->t('Reset time monitoring to global defaults') . "\n";
+				$output .= "\n🔒 " . $l->t('Only moderators/owners can change time monitoring settings') . "\n";
+				
 				return $output;
 				
 			case 'enable':
@@ -890,6 +970,9 @@ class BotInvokeListener implements IEventListener {
 		
 		switch ($action) {
 			case 'show':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('view detailed response configuration'), $lang);
+				}
 				$responseConfig = $this->roomConfigService->getResponseConfig($token);
 				$output = "### 💬 " . $l->t('Response Configuration') . "\n\n";
 				if ($responseConfig['response_mode'] === 'minimal') {
@@ -899,6 +982,21 @@ class BotInvokeListener implements IEventListener {
 					$output .= "• **" . $l->t('Response mode') . "**: 💬 " . $l->t('Normal mode') . " — " . $l->t('Full text responses') . "\n";
 					$output .= "• **" . $l->t('Text responses') . "**: " . $l->t('For all commands and operations') . "\n";
 				}
+				
+				if ($responseConfig['source'] === 'room' && ($responseConfig['configured_by'] ?? null)) {
+					$configDate = date('Y-m-d H:i', $responseConfig['configured_at'] ?? time());
+					$output .= "• **" . $l->t('Configured by') . "**: " . $responseConfig['configured_by'] . " (" . $configDate . ")\n";
+				} else {
+					$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Global defaults') . "\n";
+				}
+				
+				$output .= "\n---\n";
+				$output .= "💡 **" . $l->t('Available Commands') . ":**\n";
+				$output .= "• `config response normal` — " . $l->t('Enable full text responses') . "\n";
+				$output .= "• `config response minimal` — " . $l->t('Enable minimal responses (reduce notifications)') . "\n";
+				$output .= "• `config response reset` — " . $l->t('Reset to default settings') . "\n";
+				$output .= "\n🔒 " . $l->t('Only moderators/owners can change response settings') . "\n";
+				
 				return $output;
 				
 			case 'normal':

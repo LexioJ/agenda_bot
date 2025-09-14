@@ -244,7 +244,21 @@
         "Use `config response` for response configuration help": "Verwenden Sie `config response` für Antwort-Konfigurations-Hilfe",
         "Use `config limits` for limits configuration help": "Verwenden Sie `config limits` für Limits-Konfigurations-Hilfe",
         "Use `config auto` for auto-behaviors configuration help": "Verwenden Sie `config auto` für Auto-Verhalten-Konfigurations-Hilfe",
-        "Use `config emojis` for custom emojis configuration help": "Verwenden Sie `config emojis` für benutzerdefinierte Emojis-Konfigurations-Hilfe"
+        "Use `config emojis` for custom emojis configuration help": "Verwenden Sie `config emojis` für benutzerdefinierte Emojis-Konfigurations-Hilfe",
+        "Only moderators and owners can modify room configuration": "Nur Moderatoren und Besitzer können die Raum-Konfiguration ändern",
+        "Available Commands": "Verfügbare Befehle",
+        "Only moderators/owners can change time monitoring settings": "Nur Moderatoren/Besitzer können Zeitüberwachungs-Einstellungen ändern",
+        "Only moderators/owners can change response settings": "Nur Moderatoren/Besitzer können Antwort-Einstellungen ändern",
+        "view detailed time monitoring configuration": "detaillierte Zeitüberwachungs-Konfiguration anzeigen",
+        "view detailed response configuration": "detaillierte Antwort-Konfiguration anzeigen",
+        "Enable time monitoring for this room": "Zeitüberwachung für diesen Raum aktivieren",
+        "Disable time monitoring for this room": "Zeitüberwachung für diesen Raum deaktivieren",
+        "Set warning at 75% of planned time": "Warnung bei 75% der geplanten Zeit setzen",
+        "Set overtime alert at 120% of planned time": "Überzeit-Warnung bei 120% der geplanten Zeit setzen",
+        "Set both warning and overtime thresholds": "Beide Warn- und Überzeit-Schwellen festlegen",
+        "Enable full text responses": "Vollständige Textantworten aktivieren",
+        "Enable minimal responses (reduce notifications)": "Minimale Antworten aktivieren (Benachrichtigungen reduzieren)",
+        "Reset to default settings": "Auf Standardeinstellungen zurücksetzen"
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }
