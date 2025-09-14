@@ -25,13 +25,35 @@ class CommandParser {
 	public const SWAP_PATTERN = '/^swap\s*:\s*(\d+),\s*(\d+)$/i';
 	public const REMOVE_PATTERN = '/^(remove|delete)\s*:\s*(\d+)$/i';
 	public const CHANGE_PATTERN = '/^change\s*:\s*(\d+)\s+(?:(?:"([^"]+)"|([^(]+?))\s*(?:\(([^)]+)\))?|\(([^)]+)\))\s*$/mi';
-	// Room-level time monitoring commands
-	public const TIME_CONFIG_PATTERN = '/^time\s+(config|status)$/i';
-	public const TIME_ENABLE_PATTERN = '/^time\s+(enable|disable)$/i';
-	public const TIME_WARNING_PATTERN = '/^time\s+warning\s+(\d+)$/i';
-	public const TIME_OVERTIME_PATTERN = '/^time\s+overtime\s+(\d+)$/i';
-	public const TIME_THRESHOLDS_PATTERN = '/^time\s+thresholds\s+(\d+)\s+(\d+)$/i'; // Only 2 values now
-	public const TIME_RESET_PATTERN = '/^time\s+reset$/i';
+	// Unified config command patterns
+	public const CONFIG_SHOW_PATTERN = '/^config\s+show$/i';
+	public const CONFIG_TIME_PATTERN = '/^config\s+time$/i';
+	public const CONFIG_TIME_ENABLE_PATTERN = '/^config\s+time\s+(enable|disable)$/i';
+	public const CONFIG_TIME_WARNING_PATTERN = '/^config\s+time\s+warning\s+(\d+)$/i';
+	public const CONFIG_TIME_OVERTIME_PATTERN = '/^config\s+time\s+overtime\s+(\d+)$/i';
+	public const CONFIG_TIME_THRESHOLDS_PATTERN = '/^config\s+time\s+thresholds\s+(\d+)\s+(\d+)$/i';
+	public const CONFIG_TIME_RESET_PATTERN = '/^config\s+time\s+reset$/i';
+	public const CONFIG_RESPONSE_PATTERN = '/^config\s+response(?:\s+(show|normal|minimal|reset))?$/i';
+	public const CONFIG_RESET_PATTERN = '/^config\s+reset(?:\s+(time|response))?$/i';
+	
+	// Config limits patterns
+	public const CONFIG_LIMITS_PATTERN = '/^config\s+limits$/i';
+	public const CONFIG_LIMITS_MAX_ITEMS_PATTERN = '/^config\s+limits\s+max-items\s+(\d+)$/i';
+	public const CONFIG_LIMITS_MAX_BULK_PATTERN = '/^config\s+limits\s+max-bulk\s+(\d+)$/i';
+	public const CONFIG_LIMITS_DEFAULT_DURATION_PATTERN = '/^config\s+limits\s+default-duration\s+(\d+)$/i';
+	public const CONFIG_LIMITS_RESET_PATTERN = '/^config\s+limits\s+reset$/i';
+	
+	// Config auto-behaviors patterns
+	public const CONFIG_AUTO_PATTERN = '/^config\s+auto$/i';
+	public const CONFIG_AUTO_START_PATTERN = '/^config\s+auto\s+start-agenda\s+(enable|disable)$/i';
+	public const CONFIG_AUTO_CLEANUP_PATTERN = '/^config\s+auto\s+cleanup\s+(enable|disable)$/i';
+	public const CONFIG_AUTO_SUMMARY_PATTERN = '/^config\s+auto\s+summary\s+(enable|disable)$/i';
+	public const CONFIG_AUTO_RESET_PATTERN = '/^config\s+auto\s+reset$/i';
+	
+	// Config emojis patterns
+	public const CONFIG_EMOJIS_PATTERN = '/^config\s+emojis$/i';
+	public const CONFIG_EMOJIS_SET_PATTERN = '/^config\s+emojis\s+(current-item|completed|pending|on-time|time-warning)\s+(.+)$/i';
+	public const CONFIG_EMOJIS_RESET_PATTERN = '/^config\s+emojis\s+reset$/i';
 	public const CLEANUP_PATTERN = '/^(agenda\s+)?(cleanup|clean)$/i';
 
 	/**
@@ -153,57 +175,203 @@ class CommandParser {
 			];
 		}
 
-		// Time config command
-		if (preg_match(self::TIME_CONFIG_PATTERN, $message, $matches)) {
+		// Unified config commands (prioritized over legacy commands)
+		// Config show - display all room configuration
+		if (preg_match(self::CONFIG_SHOW_PATTERN, $message, $matches)) {
 			return [
-				'command' => 'time_config',
-				'token' => $token,
-				'subcommand' => strtolower($matches[1])
+				'command' => 'config_show',
+				'token' => $token
 			];
 		}
 
-		// Time enable/disable command
-		if (preg_match(self::TIME_ENABLE_PATTERN, $message, $matches)) {
+		// Config time - unified time monitoring configuration
+		if (preg_match(self::CONFIG_TIME_PATTERN, $message, $matches)) {
 			return [
-				'command' => 'time_enable',
+				'command' => 'config_time',
+				'token' => $token,
+				'action' => 'show'
+			];
+		}
+
+		// Config time enable/disable command
+		if (preg_match(self::CONFIG_TIME_ENABLE_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'config_time',
 				'token' => $token,
 				'action' => strtolower($matches[1])
 			];
 		}
 
-		// Time warning threshold command
-		if (preg_match(self::TIME_WARNING_PATTERN, $message, $matches)) {
+		// Config time warning threshold command
+		if (preg_match(self::CONFIG_TIME_WARNING_PATTERN, $message, $matches)) {
 			return [
-				'command' => 'time_warning',
+				'command' => 'config_time',
 				'token' => $token,
-				'threshold' => (int)$matches[1]
+				'action' => 'warning',
+				'param1' => (int)$matches[1]
 			];
 		}
 
-		// Time overtime threshold command
-		if (preg_match(self::TIME_OVERTIME_PATTERN, $message, $matches)) {
+		// Config time overtime threshold command
+		if (preg_match(self::CONFIG_TIME_OVERTIME_PATTERN, $message, $matches)) {
 			return [
-				'command' => 'time_overtime',
+				'command' => 'config_time',
 				'token' => $token,
-				'threshold' => (int)$matches[1]
+				'action' => 'overtime',
+				'param1' => (int)$matches[1]
 			];
 		}
 
-		// Time thresholds command (both warning and overtime)
-		if (preg_match(self::TIME_THRESHOLDS_PATTERN, $message, $matches)) {
+		// Config time thresholds command (both warning and overtime)
+		if (preg_match(self::CONFIG_TIME_THRESHOLDS_PATTERN, $message, $matches)) {
 			return [
-				'command' => 'time_thresholds',
+				'command' => 'config_time',
 				'token' => $token,
-				'warning_threshold' => (int)$matches[1],
-				'overtime_threshold' => (int)$matches[2]
+				'action' => 'thresholds',
+				'param1' => (int)$matches[1],
+				'param2' => (int)$matches[2]
 			];
 		}
 
-		// Time reset command
-		if (preg_match(self::TIME_RESET_PATTERN, $message, $matches)) {
+		// Config time reset command
+		if (preg_match(self::CONFIG_TIME_RESET_PATTERN, $message, $matches)) {
 			return [
-				'command' => 'time_reset',
-				'token' => $token
+				'command' => 'config_time',
+				'token' => $token,
+				'action' => 'reset'
+			];
+		}
+
+		// Config response - response behavior configuration
+		if (preg_match(self::CONFIG_RESPONSE_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'config_response',
+				'token' => $token,
+				'action' => isset($matches[1]) && $matches[1] !== '' ? strtolower($matches[1]) : 'show'
+			];
+		}
+
+		// Config reset - reset configuration sections
+		if (preg_match(self::CONFIG_RESET_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'config_reset',
+				'token' => $token,
+				'section' => isset($matches[1]) && $matches[1] !== '' ? strtolower($matches[1]) : null
+			];
+		}
+		
+		// Config limits commands
+		if (preg_match(self::CONFIG_LIMITS_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'config_limits',
+				'token' => $token,
+				'action' => 'show'
+			];
+		}
+		
+		if (preg_match(self::CONFIG_LIMITS_MAX_ITEMS_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'config_limits',
+				'token' => $token,
+				'action' => 'max-items',
+				'param1' => (int)$matches[1]
+			];
+		}
+		
+		if (preg_match(self::CONFIG_LIMITS_MAX_BULK_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'config_limits',
+				'token' => $token,
+				'action' => 'max-bulk',
+				'param1' => (int)$matches[1]
+			];
+		}
+		
+		if (preg_match(self::CONFIG_LIMITS_DEFAULT_DURATION_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'config_limits',
+				'token' => $token,
+				'action' => 'default-duration',
+				'param1' => (int)$matches[1]
+			];
+		}
+		
+		if (preg_match(self::CONFIG_LIMITS_RESET_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'config_limits',
+				'token' => $token,
+				'action' => 'reset'
+			];
+		}
+		
+		// Config auto-behaviors commands
+		if (preg_match(self::CONFIG_AUTO_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'config_auto',
+				'token' => $token,
+				'action' => 'show'
+			];
+		}
+		
+		if (preg_match(self::CONFIG_AUTO_START_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'config_auto',
+				'token' => $token,
+				'action' => 'start-agenda',
+				'param1' => strtolower($matches[1]) === 'enable'
+			];
+		}
+		
+		if (preg_match(self::CONFIG_AUTO_CLEANUP_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'config_auto',
+				'token' => $token,
+				'action' => 'cleanup',
+				'param1' => strtolower($matches[1]) === 'enable'
+			];
+		}
+		
+		if (preg_match(self::CONFIG_AUTO_SUMMARY_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'config_auto',
+				'token' => $token,
+				'action' => 'summary',
+				'param1' => strtolower($matches[1]) === 'enable'
+			];
+		}
+		
+		if (preg_match(self::CONFIG_AUTO_RESET_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'config_auto',
+				'token' => $token,
+				'action' => 'reset'
+			];
+		}
+		
+		// Config emojis commands
+		if (preg_match(self::CONFIG_EMOJIS_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'config_emojis',
+				'token' => $token,
+				'action' => 'show'
+			];
+		}
+		
+		if (preg_match(self::CONFIG_EMOJIS_SET_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'config_emojis',
+				'token' => $token,
+				'action' => 'set',
+				'param1' => strtolower($matches[1]), // emoji type
+				'param2' => trim($matches[2]) // emoji value
+			];
+		}
+		
+		if (preg_match(self::CONFIG_EMOJIS_RESET_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'config_emojis',
+				'token' => $token,
+				'action' => 'reset'
 			];
 		}
 
