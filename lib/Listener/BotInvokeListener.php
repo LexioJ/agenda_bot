@@ -163,8 +163,13 @@ class BotInvokeListener implements IEventListener {
 				// Check if there are agenda items
 				$items = $this->agendaService->getAgendaItems($token);
 				if (!empty($items)) {
-					// Auto-set first incomplete item as current
-					$this->autoSetFirstIncompleteItemAsCurrent($token, $lang);
+					// Check auto-behaviors configuration for start_agenda setting
+					$autoConfig = $this->roomConfigService->getAutoBehaviorsConfig($token);
+					
+					// Auto-set first incomplete item as current only if enabled
+					if ($autoConfig['start_agenda']) {
+						$this->autoSetFirstIncompleteItemAsCurrent($token, $lang);
+					}
 					
 					// Show current agenda status
 					$status = $this->agendaService->getAgendaStatus($token, $lang);
@@ -197,13 +202,30 @@ class BotInvokeListener implements IEventListener {
 				// Clear any current agenda items since the call has ended
 				$this->agendaService->clearAllCurrentItems($token);
 				
-			$summary = $this->summaryService->generateAgendaSummary($token, $data['target']['name'], $lang);
-				if ($summary !== null) {
-					$event->addAnswer($summary['summary'], false);
-					
-					// Try to find and store the message ID of the summary we just sent
-					// This enables more accurate reaction-based cleanup tracking
-					$this->roomConfigService->findAndStoreRecentSummaryMessageId($token);
+				// Check auto-behaviors configuration for summary and cleanup settings
+				$autoConfig = $this->roomConfigService->getAutoBehaviorsConfig($token);
+				
+				// Generate summary only if auto-summary is enabled
+				if ($autoConfig['summary']) {
+					$summary = $this->summaryService->generateAgendaSummary($token, $data['target']['name'], $lang);
+					if ($summary !== null) {
+						$event->addAnswer($summary['summary'], false);
+						
+						// Try to find and store the message ID of the summary we just sent
+						// This enables more accurate reaction-based cleanup tracking
+						$this->roomConfigService->findAndStoreRecentSummaryMessageId($token);
+					}
+				}
+				
+				// Auto-cleanup completed items if enabled (after summary generation)
+				if ($autoConfig['cleanup']) {
+					$this->logger->info('Auto-cleanup triggered on call end', ['token' => $token]);
+					$cleanupResult = $this->agendaService->removeCompletedItems($token, null, $lang);
+					$this->logger->info('Auto-cleanup result', ['result' => $cleanupResult]);
+					if ($cleanupResult && !str_contains($cleanupResult, 'No completed items')) {
+						// Send cleanup result as a separate message (emoji already included)
+						$event->addAnswer($cleanupResult, true);
+					}
 				}
 			}
 		}
@@ -381,7 +403,9 @@ class BotInvokeListener implements IEventListener {
 		// 1. Only users with conversation access can react to messages
 		// 2. Reactions are typically made by moderators/owners managing the meeting
 		// 3. The reaction itself serves as user consent for cleanup
+		$this->logger->info('Reaction-triggered cleanup', ['token' => $token, 'reaction' => $reaction]);
 		$cleanupResult = $this->agendaService->removeCompletedItems($token, null, $roomLanguage);
+		$this->logger->info('Reaction-cleanup result', ['result' => $cleanupResult]);
 		if ($cleanupResult) {
 			// Clear the stored summary message ID since cleanup was successful
 			if ($lastSummaryMessageId === $messageId) {

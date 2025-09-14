@@ -1312,9 +1312,13 @@ class AgendaService {
 				$this->logEntryMapper->updateAgendaPositions($token, $updates);
 			}
 			
-			return '🧹 ' . $l->t('Removed %d completed items and reordered %d remaining items', [$completedCount, count($incompleteItems)]);
+		$result = '🧹 ' . $l->t('Removed %d completed items and reordered %d remaining items', [$completedCount, count($incompleteItems)]);
+		\OCP\Util::writeLog('agenda_bot', 'removeCompletedItems result: ' . $result, \OCP\Util::INFO);
+		return $result;
 		} else {
-			return '🧹 ' . $l->t('Removed %d completed items - agenda is now empty', [$completedCount]);
+			$result = '🧹 ' . $l->t('Removed %d completed items - agenda is now empty', [$completedCount]);
+			\OCP\Util::writeLog('agenda_bot', 'removeCompletedItems result: ' . $result, \OCP\Util::INFO);
+			return $result;
 		}
 	}
 
