@@ -153,13 +153,6 @@ class BotInvokeListener implements IEventListener {
 				// Check if the call was started silently by looking at system message content
 				$isCallSilent = $this->isCallStartedSilently($data);
 				
-				// Log the call detection result for debugging
-				$this->logger->info('Call started - silent detection result', [
-					'token' => $token,
-					'is_silent' => $isCallSilent,
-					'object_name' => $data['object']['name'] ?? 'unknown'
-				]);
-				
 				// Check if there are agenda items
 				$items = $this->agendaService->getAgendaItems($token);
 				if (!empty($items)) {
@@ -219,10 +212,8 @@ class BotInvokeListener implements IEventListener {
 				
 				// Auto-cleanup completed items if enabled (after summary generation)
 				if ($autoConfig['cleanup']) {
-					$this->logger->info('Auto-cleanup triggered on call end', ['token' => $token]);
 					$cleanupResult = $this->agendaService->removeCompletedItems($token, null, $lang);
-					$this->logger->info('Auto-cleanup result', ['result' => $cleanupResult]);
-					if ($cleanupResult && !str_contains($cleanupResult, 'No completed items')) {
+					if ($cleanupResult && !str_contains($cleanupResult, 'No completed items to remove')) {
 						// Send cleanup result as a separate message (emoji already included)
 						$event->addAnswer($cleanupResult, true);
 					}
@@ -392,20 +383,11 @@ class BotInvokeListener implements IEventListener {
 		// Get stored room language for localized messages
 		$roomLanguage = $this->roomConfigService->getRoomLanguage($token) ?? 'en';
 		
-		$this->logger->info('Processing cleanup reaction', [
-			'token' => $token,
-			'reaction' => $reaction,
-			'actor' => $actorData['name'] ?? 'unknown',
-			'room_language' => $roomLanguage
-		]);
-		
 		// For reaction-triggered cleanup, bypass permission check since:
 		// 1. Only users with conversation access can react to messages
 		// 2. Reactions are typically made by moderators/owners managing the meeting
 		// 3. The reaction itself serves as user consent for cleanup
-		$this->logger->info('Reaction-triggered cleanup', ['token' => $token, 'reaction' => $reaction]);
 		$cleanupResult = $this->agendaService->removeCompletedItems($token, null, $roomLanguage);
-		$this->logger->info('Reaction-cleanup result', ['result' => $cleanupResult]);
 		if ($cleanupResult) {
 			// Clear the stored summary message ID since cleanup was successful
 			if ($lastSummaryMessageId === $messageId) {
