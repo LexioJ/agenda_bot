@@ -339,9 +339,9 @@ class RoomConfigService {
 	];
 	
 	public const DEFAULT_AUTO_BEHAVIORS = [
-		'start_agenda' => false,
+		'start_agenda' => true,
 		'cleanup' => false,
-		'summary' => false,
+		'summary' => true,
 	];
 	
 	public const DEFAULT_EMOJIS = [
@@ -670,6 +670,102 @@ class RoomConfigService {
 		}
 		
 		$this->logger->info('Reset response config for token: ' . $token);
+		return true;
+	}
+	
+	/**
+	 * Reset custom emojis configuration to global defaults
+	 */
+	public function resetEmojisConfig(string $token): bool {
+		$roomConfigEntry = $this->findRoomConfigEntry($token);
+		
+		if (!$roomConfigEntry) {
+			return false; // No config to reset
+		}
+		
+		$configData = json_decode($roomConfigEntry->getDetails() ?: '{}', true);
+		
+		// Remove custom_emojis section if it exists
+		if (!isset($configData['custom_emojis'])) {
+			return false; // No emojis config to reset
+		}
+		
+		unset($configData['custom_emojis']);
+		
+		// If config is now empty (only metadata), delete the entire entry
+		if (empty(array_diff_key($configData, ['configured_by', 'configured_at', 'language', 'language_updated_at', 'last_summary_message_id', 'last_summary_timestamp']))) {
+			$this->logEntryMapper->delete($roomConfigEntry);
+		} else {
+			// Update config without custom_emojis section
+			$roomConfigEntry->setDetails(json_encode($configData, JSON_THROW_ON_ERROR));
+			$this->logEntryMapper->update($roomConfigEntry);
+		}
+		
+		$this->logger->info('Reset custom emojis config for token: ' . $token);
+		return true;
+	}
+	
+	/**
+	 * Reset auto-behaviors configuration to global defaults
+	 */
+	public function resetAutoBehaviorsConfig(string $token): bool {
+		$roomConfigEntry = $this->findRoomConfigEntry($token);
+		
+		if (!$roomConfigEntry) {
+			return false; // No config to reset
+		}
+		
+		$configData = json_decode($roomConfigEntry->getDetails() ?: '{}', true);
+		
+		// Remove auto_behaviors section if it exists
+		if (!isset($configData['auto_behaviors'])) {
+			return false; // No auto-behaviors config to reset
+		}
+		
+		unset($configData['auto_behaviors']);
+		
+		// If config is now empty (only metadata), delete the entire entry
+		if (empty(array_diff_key($configData, ['configured_by', 'configured_at', 'language', 'language_updated_at', 'last_summary_message_id', 'last_summary_timestamp']))) {
+			$this->logEntryMapper->delete($roomConfigEntry);
+		} else {
+			// Update config without auto_behaviors section
+			$roomConfigEntry->setDetails(json_encode($configData, JSON_THROW_ON_ERROR));
+			$this->logEntryMapper->update($roomConfigEntry);
+		}
+		
+		$this->logger->info('Reset auto-behaviors config for token: ' . $token);
+		return true;
+	}
+	
+	/**
+	 * Reset agenda limits configuration to global defaults
+	 */
+	public function resetAgendaLimitsConfig(string $token): bool {
+		$roomConfigEntry = $this->findRoomConfigEntry($token);
+		
+		if (!$roomConfigEntry) {
+			return false; // No config to reset
+		}
+		
+		$configData = json_decode($roomConfigEntry->getDetails() ?: '{}', true);
+		
+		// Remove agenda_limits section if it exists
+		if (!isset($configData['agenda_limits'])) {
+			return false; // No agenda limits config to reset
+		}
+		
+		unset($configData['agenda_limits']);
+		
+		// If config is now empty (only metadata), delete the entire entry
+		if (empty(array_diff_key($configData, ['configured_by', 'configured_at', 'language', 'language_updated_at', 'last_summary_message_id', 'last_summary_timestamp']))) {
+			$this->logEntryMapper->delete($roomConfigEntry);
+		} else {
+			// Update config without agenda_limits section
+			$roomConfigEntry->setDetails(json_encode($configData, JSON_THROW_ON_ERROR));
+			$this->logEntryMapper->update($roomConfigEntry);
+		}
+		
+		$this->logger->info('Reset agenda limits config for token: ' . $token);
 		return true;
 	}
 	

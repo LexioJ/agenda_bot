@@ -568,9 +568,9 @@ class BotInvokeListener implements IEventListener {
 		
 		if ($timeConfig['source'] === 'room' && ($timeConfig['configured_by'] ?? null)) {
 			$configDate = date('Y-m-d H:i', $timeConfig['configured_at'] ?? time());
-			$output .= "• **" . $l->t('Configured by') . "**: " . $timeConfig['configured_by'] . " (" . $configDate . ")\n";
+			$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . $timeConfig['configured_by'] . " (" . $configDate . ")\n";
 		} else {
-			$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Global defaults') . "\n";
+			$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
 		}
 		$output .= "💡 " . $l->t('Use `config time` for time configuration help') . "\n";
 		
@@ -586,23 +586,23 @@ class BotInvokeListener implements IEventListener {
 		
 		if ($responseConfig['source'] === 'room' && ($responseConfig['configured_by'] ?? null)) {
 			$configDate = date('Y-m-d H:i', $responseConfig['configured_at'] ?? time());
-			$output .= "• **" . $l->t('Configured by') . "**: " . ($responseConfig['configured_by'] ?? 'Unknown') . " (" . $configDate . ")\n";
+			$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . ($responseConfig['configured_by'] ?? 'Unknown') . " (" . $configDate . ")\n";
 		} else {
-			$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Global defaults') . "\n";
+			$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
 		}
 		$output .= "💡 " . $l->t('Use `config response` for response configuration help') . "\n";
 		
 		// Agenda limits section
-		$output .= "\n##### 📊 " . $l->t('Agenda Limits') . "\n";
+		$output .= "\n##### 🚧 " . $l->t('Agenda Limits') . "\n";
 		$output .= "• **" . $l->t('Max total items') . "**: " . $limitsConfig['max_items'] . " " . $l->t('items') . "\n";
 		$output .= "• **" . $l->t('Max bulk operation') . "**: " . $limitsConfig['max_bulk_items'] . " " . $l->t('items') . "\n";
 		$output .= "• **" . $l->t('Default item duration') . "**: " . $limitsConfig['default_duration'] . " " . $l->t('minutes') . "\n";
 		
 		if ($limitsConfig['source'] === 'room' && ($limitsConfig['configured_by'] ?? null)) {
 			$configDate = date('Y-m-d H:i', $limitsConfig['configured_at'] ?? time());
-			$output .= "• **" . $l->t('Configured by') . "**: " . $limitsConfig['configured_by'] . " (" . $configDate . ")\n";
+			$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . $limitsConfig['configured_by'] . " (" . $configDate . ")\n";
 		} else {
-			$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Global defaults') . "\n";
+			$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
 		}
 		$output .= "💡 " . $l->t('Use `config limits` for limits configuration help') . "\n";
 		
@@ -614,9 +614,9 @@ class BotInvokeListener implements IEventListener {
 		
 		if ($autoConfig['source'] === 'room' && ($autoConfig['configured_by'] ?? null)) {
 			$configDate = date('Y-m-d H:i', $autoConfig['configured_at'] ?? time());
-			$output .= "• **" . $l->t('Configured by') . "**: " . $autoConfig['configured_by'] . " (" . $configDate . ")\n";
+			$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . $autoConfig['configured_by'] . " (" . $configDate . ")\n";
 		} else {
-			$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Global defaults') . "\n";
+			$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
 		}
 		$output .= "💡 " . $l->t('Use `config auto` for auto-behaviors configuration help') . "\n";
 		
@@ -630,9 +630,9 @@ class BotInvokeListener implements IEventListener {
 		
 		if ($emojisConfig['source'] === 'room' && ($emojisConfig['configured_by'] ?? null)) {
 			$configDate = date('Y-m-d H:i', $emojisConfig['configured_at'] ?? time());
-			$output .= "• **" . $l->t('Configured by') . "**: " . $emojisConfig['configured_by'] . " (" . $configDate . ")\n";
+			$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . $emojisConfig['configured_by'] . " (" . $configDate . ")\n";
 		} else {
-			$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Global defaults') . "\n";
+			$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
 		}
 		$output .= "💡 " . $l->t('Use `config emojis` for custom emojis configuration help') . "\n";
 		
@@ -654,16 +654,16 @@ class BotInvokeListener implements IEventListener {
 					return $this->permissionService->getPermissionDeniedMessage($l->t('view detailed limits configuration'), $lang);
 				}
 				$limitsConfig = $this->roomConfigService->getAgendaLimitsConfig($token);
-				$output = "### 📊 " . $l->t('Agenda Limits Configuration') . "\n\n";
+				$output = "### 🚧 " . $l->t('Agenda Limits Configuration') . "\n\n";
 				$output .= "• **" . $l->t('Max total items') . "**: " . $limitsConfig['max_items'] . " " . $l->t('items') . "\n";
 				$output .= "• **" . $l->t('Max bulk operation') . "**: " . $limitsConfig['max_bulk_items'] . " " . $l->t('items') . "\n";
 				$output .= "• **" . $l->t('Default item duration') . "**: " . $limitsConfig['default_duration'] . " " . $l->t('minutes') . "\n";
 				
 				if ($limitsConfig['source'] === 'room' && ($limitsConfig['configured_by'] ?? null)) {
 					$configDate = date('Y-m-d H:i', $limitsConfig['configured_at'] ?? time());
-					$output .= "• **" . $l->t('Configured by') . "**: " . $limitsConfig['configured_by'] . " (" . $configDate . ")\n";
+					$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . $limitsConfig['configured_by'] . " (" . $configDate . ")\n";
 				} else {
-					$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Global defaults') . "\n";
+					$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
 				}
 				
 				$output .= "\n---\n";
@@ -767,9 +767,9 @@ class BotInvokeListener implements IEventListener {
 				
 				if ($autoConfig['source'] === 'room' && ($autoConfig['configured_by'] ?? null)) {
 					$configDate = date('Y-m-d H:i', $autoConfig['configured_at'] ?? time());
-					$output .= "• **" . $l->t('Configured by') . "**: " . $autoConfig['configured_by'] . " (" . $configDate . ")\n";
+					$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . $autoConfig['configured_by'] . " (" . $configDate . ")\n";
 				} else {
-					$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Global defaults') . "\n";
+					$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
 				}
 				
 				$output .= "\n---\n";
@@ -846,9 +846,9 @@ class BotInvokeListener implements IEventListener {
 				
 				if ($emojisConfig['source'] === 'room' && ($emojisConfig['configured_by'] ?? null)) {
 					$configDate = date('Y-m-d H:i', $emojisConfig['configured_at'] ?? time());
-					$output .= "• **" . $l->t('Configured by') . "**: " . $emojisConfig['configured_by'] . " (" . $configDate . ")\n";
+					$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . $emojisConfig['configured_by'] . " (" . $configDate . ")\n";
 				} else {
-					$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Global defaults') . "\n";
+					$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
 				}
 				
 				$output .= "\n---\n";
@@ -917,9 +917,9 @@ class BotInvokeListener implements IEventListener {
 				
 				if ($timeConfig['source'] === 'room' && ($timeConfig['configured_by'] ?? null)) {
 					$configDate = date('Y-m-d H:i', $timeConfig['configured_at'] ?? time());
-					$output .= "• **" . $l->t('Configured by') . "**: " . $timeConfig['configured_by'] . " (" . $configDate . ")\n";
+					$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . $timeConfig['configured_by'] . " (" . $configDate . ")\n";
 				} else {
-					$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Global defaults') . "\n";
+					$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
 				}
 				
 				$output .= "\n---\n";
@@ -1013,9 +1013,9 @@ class BotInvokeListener implements IEventListener {
 				
 				if ($responseConfig['source'] === 'room' && ($responseConfig['configured_by'] ?? null)) {
 					$configDate = date('Y-m-d H:i', $responseConfig['configured_at'] ?? time());
-					$output .= "• **" . $l->t('Configured by') . "**: " . $responseConfig['configured_by'] . " (" . $configDate . ")\n";
+					$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . $responseConfig['configured_by'] . " (" . $configDate . ")\n";
 				} else {
-					$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Global defaults') . "\n";
+					$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
 				}
 				
 				$output .= "\n---\n";
