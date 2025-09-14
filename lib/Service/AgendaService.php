@@ -328,6 +328,7 @@ class AgendaService {
 		$currentItem = $this->getCurrentAgendaItem($token);
 
 		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		$emojis = $this->roomConfigService->getEmojisConfig($token);
 		$status = "### 📋 " . $l->t('Agenda Status') . "\n\n";
 
 		if (empty($items)) {
@@ -344,10 +345,10 @@ class AgendaService {
 				$timeSpentDisplay = $this->timingUtilityService->formatDurationDisplay($timeSpent, $lang);
 				$plannedDisplay = $this->timingUtilityService->formatDurationDisplay($item['duration'], $lang);
 				$timeInfo = " *({$timeSpentDisplay}/{$plannedDisplay})*";
-				$prefix = "`🗣️ {$item['position']} {$item['title']}`";
+				$prefix = "`{$emojis['current_item']} {$item['position']} {$item['title']}`";
 				$title = '';
 			} elseif ($item['completed']) {
-				$icon = $l->t('Completed') . ' ';
+				$icon = $emojis['completed'] . ' ';
 				$actualDuration = 0;
 				if (!empty($item['start_time']) && !empty($item['completed_at'])) {
 					$actualDuration = $this->timingUtilityService->calculateActualDurationFromTimestamps($item['start_time'], $item['completed_at']);
@@ -357,7 +358,7 @@ class AgendaService {
 				$timeInfo = " *(" . $l->t('%s/%s', [$actualDisplay, $plannedDisplay]) . ")*";
 				$title = $item['title'];
 			} else {
-				$icon = $l->t('Pending') . ' ';
+				$icon = $emojis['pending'] . ' ';
 				$timeInfo = " *(" . $l->t('%s', [$this->timingUtilityService->formatDurationDisplay($item['duration'], $lang)]) . ")*";
 				$title = $item['title'];
 			}

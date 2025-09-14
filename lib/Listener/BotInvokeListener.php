@@ -566,10 +566,10 @@ class BotInvokeListener implements IEventListener {
 		} else {
 			$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Global defaults') . "\n";
 		}
-		$output .= "💡 Use `config time` for time configuration help\n";
+		$output .= "💡 " . $l->t('Use `config time` for time configuration help') . "\n";
 		
 		// Response settings section
-		$output .= "\n##### 💬 " . $l->t('Response Settings') . "\n";
+		$output .= "\n##### 💬 " . $l->t('Response') . "\n";
 		if ($responseConfig['response_mode'] === 'minimal') {
 			$output .= "• **" . $l->t('Response mode') . "**: 😴 " . $l->t('Minimal mode') . " — " . $l->t('Emoji reactions only') . "\n";
 			$output .= "• **" . $l->t('Text responses') . "**: " . $l->t('Only for help, status, and call notifications') . "\n";
@@ -584,7 +584,7 @@ class BotInvokeListener implements IEventListener {
 		} else {
 			$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Global defaults') . "\n";
 		}
-		$output .= "💡 Use `config response` for response configuration help\n";
+		$output .= "💡 " . $l->t('Use `config response` for response configuration help') . "\n";
 		
 		// Agenda limits section
 		$output .= "\n##### 📊 " . $l->t('Agenda Limits') . "\n";
@@ -598,7 +598,7 @@ class BotInvokeListener implements IEventListener {
 		} else {
 			$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Global defaults') . "\n";
 		}
-		$output .= "💡 Use `config limits` for limits configuration help\n";
+		$output .= "💡 " . $l->t('Use `config limits` for limits configuration help') . "\n";
 		
 		// Auto-behaviors section
 		$output .= "\n##### 🤖 " . $l->t('Auto-behaviors') . "\n";
@@ -612,7 +612,7 @@ class BotInvokeListener implements IEventListener {
 		} else {
 			$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Global defaults') . "\n";
 		}
-		$output .= "💡 Use `config auto` for auto-behaviors configuration help\n";
+		$output .= "💡 " . $l->t('Use `config auto` for auto-behaviors configuration help') . "\n";
 		
 		// Custom emojis section
 		$output .= "\n##### 😀 " . $l->t('Custom Emojis') . "\n";
@@ -628,7 +628,7 @@ class BotInvokeListener implements IEventListener {
 		} else {
 			$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Global defaults') . "\n";
 		}
-		$output .= "💡 Use `config emojis` for custom emojis configuration help\n";
+		$output .= "💡 " . $l->t('Use `config emojis` for custom emojis configuration help') . "\n";
 		
 		$output .= "\n---\n";
 		$output .= "🔒 " . $l->t('Only moderators and owners can modify room configuration') . "\n";
@@ -717,7 +717,29 @@ class BotInvokeListener implements IEventListener {
 		if (!$actorData) {
 			return 'system';
 		}
-		return $actorData['id'] ?? ($actorData['name'] ?? 'unknown');
+		$rawUserId = $actorData['id'] ?? ($actorData['name'] ?? 'unknown');
+		return $this->cleanUserId($rawUserId);
+	}
+	
+	/**
+	 * Clean user ID by removing common prefixes like 'users/', 'guests/', etc.
+	 */
+	private function cleanUserId(string $rawUserId): string {
+		// Remove common prefixes that might be present in actor data
+		if (str_starts_with($rawUserId, 'users/')) {
+			return substr($rawUserId, 6); // Remove 'users/' prefix
+		}
+		if (str_starts_with($rawUserId, 'guests/')) {
+			return substr($rawUserId, 7); // Remove 'guests/' prefix
+		}
+		if (str_starts_with($rawUserId, 'emails/')) {
+			return substr($rawUserId, 7); // Remove 'emails/' prefix
+		}
+		if (str_starts_with($rawUserId, 'federated_users/')) {
+			return substr($rawUserId, 16); // Remove 'federated_users/' prefix
+		}
+		
+		return $rawUserId; // Return as-is if no known prefix
 	}
 
 	/**
