@@ -198,6 +198,7 @@
         "time overtime": "time overtime",
         "time thresholds": "time thresholds",
         "time reset": "time reset",
+        "Agenda limit exceeded: %d items already exist, cannot add %d more (maximum: %d)": "Tagesordnungslimit überschritten: %d Punkte existieren bereits, kann %d weitere nicht hinzufügen (Maximum: %d)",
         "Hi there! I'm your agenda assistant": "Hallo! Ich bin Ihr Tagesordnungs-Assistent",
         "I'm here to help you stay organized and keep your meetings on track with smart agenda management and time tracking.": "Ich helfe Ihnen dabei, organisiert zu bleiben und Ihre Meetings mit intelligentem Tagesordnungs-Management und Zeiterfassung auf Kurs zu halten.",
         "Note: You can delete this welcome message if desired.": "Hinweis: Sie können diese Willkommensnachricht löschen, wenn Sie möchten.",

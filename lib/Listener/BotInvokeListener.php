@@ -111,7 +111,7 @@ class BotInvokeListener implements IEventListener {
 
 
 			// Check if this is a bulk agenda format first (has priority over single items)
-			$bulkAgendaData = $this->agendaService->parseBulkAgendaItems($message);
+			$bulkAgendaData = $this->agendaService->parseBulkAgendaItems($message, $token);
 			if ($bulkAgendaData) {
 				$result = $this->agendaService->addBulkAgendaItems($token, $bulkAgendaData, $data['actor'] ?? null, $lang);
 				$event->addAnswer($result['message'], true);
@@ -119,7 +119,7 @@ class BotInvokeListener implements IEventListener {
 			}
 			
 			// Check if this is a single agenda item
-			$agendaData = $this->agendaService->parseAgendaItem($message);
+			$agendaData = $this->agendaService->parseAgendaItem($message, $token);
 			if ($agendaData) {
 				$result = $this->agendaService->addAgendaItem($token, $agendaData, $data['actor'] ?? null, $lang);
 				if ($result['success']) {

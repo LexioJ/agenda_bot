@@ -48,10 +48,17 @@ class AgendaService {
 	/**
 	 * Parse agenda item from message
 	 */
-	public function parseAgendaItem(string $message): ?array {
+	public function parseAgendaItem(string $message, ?string $token = null): ?array {
 		if (preg_match(self::AGENDA_PATTERN, $message, $matches)) {
 			$durationText = isset($matches[4]) && $matches[4] !== '' ? trim($matches[4]) : '';
-			$durationMinutes = $this->timingUtilityService->parseDurationToMinutes($durationText);
+			
+			// Use room default duration if no explicit duration provided
+			if (empty($durationText) && $token !== null) {
+				$limitsConfig = $this->roomConfigService->getAgendaLimitsConfig($token);
+				$durationMinutes = $limitsConfig['default_duration'];
+			} else {
+				$durationMinutes = $this->timingUtilityService->parseDurationToMinutes($durationText);
+			}
 			
 			return [
 				'title' => trim($matches[3]),
@@ -66,7 +73,7 @@ class AgendaService {
 	 * Parse bulk agenda items from message
 	 * Format: agenda:\n- Item 1 (15m)\n- Item 2\n* Item 3 (30m)
 	 */
-	public function parseBulkAgendaItems(string $message): ?array {
+	public function parseBulkAgendaItems(string $message, string $token): ?array {
 		// Check if this matches the bulk agenda pattern
 		if (!preg_match(self::BULK_AGENDA_PATTERN, $message, $matches)) {
 			return null;
@@ -94,7 +101,14 @@ class AgendaService {
 			// Check if line matches bullet pattern
 			if (preg_match(self::BULLET_ITEM_PATTERN, $trimmedLine, $itemMatches)) {
 				$durationText = isset($itemMatches[3]) && $itemMatches[3] !== '' ? trim($itemMatches[3]) : '';
-				$durationMinutes = $this->timingUtilityService->parseDurationToMinutes($durationText);
+				
+				// Use room default duration if no explicit duration provided
+				if (empty($durationText)) {
+					$limitsConfig = $this->roomConfigService->getAgendaLimitsConfig($token);
+					$durationMinutes = $limitsConfig['default_duration'];
+				} else {
+					$durationMinutes = $this->timingUtilityService->parseDurationToMinutes($durationText);
+				}
 				$title = trim($itemMatches[2]);
 				
 				// Skip items with empty titles
@@ -109,12 +123,14 @@ class AgendaService {
 					'line_number' => $lineNumber
 				];
 				
-				// Check for max items limit
-				if (count($items) > self::MAX_BULK_ITEMS) {
+				// Check for room-specific max bulk items limit
+				$limitsConfig = $this->roomConfigService->getAgendaLimitsConfig($token);
+				$maxBulkItems = $limitsConfig['max_bulk_items'];
+				if (count($items) > $maxBulkItems) {
 					return [
 						'error' => 'max_items_exceeded',
 						'found_items' => count($items),
-						'max_items' => self::MAX_BULK_ITEMS
+						'max_items' => $maxBulkItems
 					];
 				}
 			}
@@ -134,6 +150,37 @@ class AgendaService {
 
 
 	/**
+	 * Get current agenda item count for a room
+	 */
+	public function getCurrentAgendaCount(string $token): int {
+		$agendaItems = $this->logEntryMapper->findAgendaItems($token);
+		return count($agendaItems);
+	}
+	
+	/**
+	 * Check if adding items would exceed agenda limits
+	 */
+	private function validateAgendaLimits(string $token, int $itemsToAdd, string $lang = 'en'): array {
+		$limitsConfig = $this->roomConfigService->getAgendaLimitsConfig($token);
+		$currentCount = $this->getCurrentAgendaCount($token);
+		$maxItems = $limitsConfig['max_items'];
+		
+		if ($currentCount + $itemsToAdd > $maxItems) {
+			$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+			return [
+				'success' => false,
+				'message' => '🚫 ' . $l->t('Agenda limit exceeded: %d items already exist, cannot add %d more (maximum: %d)', [
+					$currentCount,
+					$itemsToAdd,
+					$maxItems
+				])
+			];
+		}
+		
+		return ['success' => true];
+	}
+	
+	/**
 	 * Add agenda item (requires add permissions: types 1,2,3,6)
 	 */
 	public function addAgendaItem(string $token, array $agendaData, ?array $actorData = null, string $lang = 'en'): array {
@@ -143,6 +190,12 @@ class AgendaService {
 				'success' => false,
 				'message' => $this->permissionService->getAddAgendaDeniedMessage($lang)
 			];
+		}
+		
+		// Check agenda limits before adding the item
+		$limitCheck = $this->validateAgendaLimits($token, 1, $lang);
+		if (!$limitCheck['success']) {
+			return $limitCheck;
 		}
 		
 		$position = $agendaData['position'] ?? $this->logEntryMapper->getNextAgendaPosition($token);
@@ -212,6 +265,13 @@ class AgendaService {
 				'success' => false,
 				'message' => '❌ ' . $l->t('No valid agenda items found in bulk format')
 			];
+		}
+		
+		// Check agenda limits before adding bulk items
+		$itemsToAdd = count($items);
+		$limitCheck = $this->validateAgendaLimits($token, $itemsToAdd, $lang);
+		if (!$limitCheck['success']) {
+			return $limitCheck;
 		}
 		
 		$addedItems = [];
