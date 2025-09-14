@@ -1,11 +1,93 @@
 # Multi-language Support Implementation
 
 ## Overview
-This document describes the implementation of multi-language support for the Agenda Bot, following Nextcloud's l10n standard.
+This document describes the implementation of multi-language support for the Agenda Bot, following Nextcloud's l10n standard. Enhanced in v1.4.0 with comprehensive Room-Level Bot Configuration localization.
+
+## v1.4.0 Configuration Localization Features 🎆 New
+
+### Room-Level Configuration Translation
+All 5 configuration areas are fully localized:
+
+#### 1. Time Monitoring Configuration
+```php
+// Examples of translated configuration messages
+$this->l->t('Time monitoring is currently enabled for this room.')
+$this->l->t('Warning thresholds: {percentage1}% and {percentage2}%')
+$this->l->t('Overtime warning at {threshold}%')
+```
+
+#### 2. Response Mode Configuration
+```php
+// Response mode descriptions
+$this->l->t('Response mode: Normal (shows confirmations and status)')
+$this->l->t('Response mode: Minimal (reduced output for less distraction)')
+```
+
+#### 3. Agenda Limits Configuration
+```php
+// Limit configuration messages
+$this->l->t('Maximum agenda items: {limit}')
+$this->l->t('No agenda item limit set')
+```
+
+#### 4. Auto-Behavior Configuration
+```php
+// Auto-behavior descriptions
+$this->l->t('Auto-summary: {status} (generates meeting summary when agenda completes)')
+$this->l->t('Auto-cleanup: {status} (suggests cleanup after meeting ends)')
+```
+
+#### 5. Custom Emojis Configuration
+```php
+// Emoji configuration feedback
+$this->l->t('Custom pending emoji: {emoji}')
+$this->l->t('Custom completed emoji: {emoji}')
+$this->l->t('Using default emojis: ⏳ (pending) and ✅ (completed)')
+```
+
+### Enhanced Help System
+Contextual help is now fully localized:
+
+#### Role-Based Help Content
+```php
+// Different help for moderators vs users
+if ($isModerator) {
+    $help[] = $this->l->t('**Moderator Commands:**');
+    $help[] = $this->l->t('• `config show` - Show complete room configuration overview');
+}
+```
+
+#### Configuration Area Help
+```php
+// Each configuration area has dedicated help
+$this->l->t('**Time Monitoring:** Configure meeting duration tracking and warnings')
+$this->l->t('**Response Mode:** Control bot verbosity (normal/minimal)')
+$this->l->t('**Agenda Limits:** Set maximum number of agenda items')
+```
+
+### Translation Key Organization
+New translation keys follow a structured naming convention:
+
+#### Configuration Display Keys
+- `config_show_*` - Configuration overview display
+- `config_area_*` - Configuration area names and descriptions
+- `config_setting_*` - Individual setting descriptions
+- `config_metadata_*` - "Configured by" and timestamp information
+
+#### Configuration Command Keys
+- `config_cmd_*` - Command-specific messages
+- `config_validation_*` - Input validation messages
+- `config_success_*` - Success confirmation messages
+- `config_error_*` - Error and warning messages
+
+#### Help System Keys
+- `help_*` - General help content
+- `help_config_*` - Configuration-specific help
+- `help_role_*` - Role-specific help content
 
 ## Implementation Details
 
-### 1. Services Updated
+### 1. Language Detection
 The following services have been updated to support l10n:
 
 #### AgendaService
@@ -45,14 +127,18 @@ The following services have been updated to support l10n:
 
 ### 2. Translation Files Created
 
-#### English (en.json)
-- Complete translation file with 72+ strings
-- Includes all user-facing messages
+#### English (en.json) ⚡ Enhanced in v1.4.0
+- Complete translation file with 200+ strings
+- Includes all user-facing messages and configuration options
+- All 5 configuration areas fully translated
 - Proper pluralization rules
+- Comprehensive error handling messages
 
-#### German (de.json)
-- Example translation file with German translations
-- Demonstrates how additional languages can be added
+#### German (de.json) ⚡ Enhanced in v1.4.0
+- Complete German translation with 200+ strings
+- Full localization for all Room-Level Bot Configuration features
+- Cultural adaptations for German-speaking users
+- Professional terminology for business environments
 
 ### 3. Key Features
 
@@ -77,32 +163,50 @@ $l = $this->l10nFactory->get(Application::APP_ID, $lang);
 $message = $l->t('Translatable message');
 ```
 
-### 4. Translated Message Categories
+### 4. Translated Message Categories ⚡ Enhanced in v1.4.0
 
 #### Status Messages
 - Agenda status displays
 - Item completion status
 - Current item indicators
+- Configuration overview displays
 
 #### Error Messages
 - Permission denied messages
 - Item not found errors
 - Invalid operation warnings
+- Configuration validation errors
 
 #### Action Confirmations
 - Item added confirmations
 - Completion notifications
 - Reordering results
+- Configuration update confirmations
 
-#### Help Content
-- Command descriptions
-- Usage instructions
-- Feature explanations
+#### Help Content ⚡ New in v1.4.0
+- Command descriptions with examples
+- Usage instructions for all 5 configuration areas
+- Feature explanations with contextual help
+- Role-based help content (moderator vs. user)
+
+#### Room Configuration 🎆 New in v1.4.0
+- Complete `config show` output localization
+- All configuration area descriptions
+- Setting names and value descriptions
+- Configuration metadata (who configured, when)
+- Help text for each configuration area
 
 #### Time Monitoring
 - Time check alerts
 - Overtime warnings
 - Duration displays
+- Threshold configuration messages
+
+#### Response & Behavior Configuration 🎆 New in v1.4.0
+- Response mode descriptions (normal/minimal)
+- Auto-behavior setting descriptions
+- Limit configuration messages
+- Emoji customization feedback
 
 #### Summary Generation
 - Meeting summaries
@@ -156,9 +260,11 @@ Each language bot:
 - Responds in the appropriate language
 - Is registered via `BotInstallEvent` with language-specific URLs
 
-### Current Language Support
-- **English** (`en`) - Complete
-- **German** (`de`) - Complete
+### Current Language Support ⚡ Enhanced in v1.4.0
+- **English** (`en`) - Complete with 200+ translation keys including all configuration areas
+- **German** (`de`) - Complete with 200+ translation keys including all configuration areas
+- **Room Configuration**: All 5 configuration areas fully translated in both languages
+- **Contextual Help**: Configuration-specific help and examples localized
 
 ### Bot Registration Process
 1. `BotService::installBot()` iterates through `Bot::SUPPORTED_LANGUAGES`
@@ -166,18 +272,21 @@ Each language bot:
 3. Each bot gets unique identifier: `{secret}{lang}` (e.g., `abc123en`, `abc123de`)
 4. Bot URL includes language: `nextcloudapp://agenda_bot/{lang}`
 
-## Current Limitations
+## Current Limitations ⚡ Improved in v1.4.0
 
-### Background Job Language Detection
-- **TimeMonitorService**: Background jobs cannot access bot URL language context
-- Currently uses 'en' (English) fallback for time monitoring warnings
-- Room-based language detection methods not available in current Talk API
-- **Impact**: Time warnings always sent in English, regardless of room language
+### Background Job Language Detection ⚡ Enhanced
+- **TimeMonitorService**: Now uses room language storage for background job localization
+- **RoomConfigService**: Stores room language preferences for background job use
+- Room language automatically detected and stored from bot interactions
+- **Impact**: Time warnings now sent in appropriate room language
+- **Fallback**: English used only when room language cannot be determined
 
-### Language Context Availability
+### Language Context Availability ⚡ Enhanced in v1.4.0
 - Interactive bot commands: ✅ Full language support (via bot URL)
-- Background time monitoring: ⚠️ English only (no language context available)
+- Background time monitoring: ✅ Room language support (via stored room preferences)
 - Event-driven responses: ✅ Full language support (via event data)
+- Configuration commands: ✅ Complete localization for all 5 areas
+- Help system: ✅ Contextual, role-based help in user's language
 
 ## Future Enhancements
 - **Room language detection**: Implement proper room-based language detection when API becomes available

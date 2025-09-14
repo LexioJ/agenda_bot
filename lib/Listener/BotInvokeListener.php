@@ -111,7 +111,7 @@ class BotInvokeListener implements IEventListener {
 
 
 			// Check if this is a bulk agenda format first (has priority over single items)
-			$bulkAgendaData = $this->agendaService->parseBulkAgendaItems($message);
+			$bulkAgendaData = $this->agendaService->parseBulkAgendaItems($message, $token);
 			if ($bulkAgendaData) {
 				$result = $this->agendaService->addBulkAgendaItems($token, $bulkAgendaData, $data['actor'] ?? null, $lang);
 				$event->addAnswer($result['message'], true);
@@ -119,7 +119,7 @@ class BotInvokeListener implements IEventListener {
 			}
 			
 			// Check if this is a single agenda item
-			$agendaData = $this->agendaService->parseAgendaItem($message);
+			$agendaData = $this->agendaService->parseAgendaItem($message, $token);
 			if ($agendaData) {
 				$result = $this->agendaService->addAgendaItem($token, $agendaData, $data['actor'] ?? null, $lang);
 				if ($result['success']) {
@@ -153,18 +153,16 @@ class BotInvokeListener implements IEventListener {
 				// Check if the call was started silently by looking at system message content
 				$isCallSilent = $this->isCallStartedSilently($data);
 				
-				// Log the call detection result for debugging
-				$this->logger->info('Call started - silent detection result', [
-					'token' => $token,
-					'is_silent' => $isCallSilent,
-					'object_name' => $data['object']['name'] ?? 'unknown'
-				]);
-				
 				// Check if there are agenda items
 				$items = $this->agendaService->getAgendaItems($token);
 				if (!empty($items)) {
-					// Auto-set first incomplete item as current
-					$this->autoSetFirstIncompleteItemAsCurrent($token, $lang);
+					// Check auto-behaviors configuration for start_agenda setting
+					$autoConfig = $this->roomConfigService->getAutoBehaviorsConfig($token);
+					
+					// Auto-set first incomplete item as current only if enabled
+					if ($autoConfig['start_agenda']) {
+						$this->autoSetFirstIncompleteItemAsCurrent($token, $lang);
+					}
 					
 					// Show current agenda status
 					$status = $this->agendaService->getAgendaStatus($token, $lang);
@@ -197,13 +195,28 @@ class BotInvokeListener implements IEventListener {
 				// Clear any current agenda items since the call has ended
 				$this->agendaService->clearAllCurrentItems($token);
 				
-			$summary = $this->summaryService->generateAgendaSummary($token, $data['target']['name'], $lang);
-				if ($summary !== null) {
-					$event->addAnswer($summary['summary'], false);
-					
-					// Try to find and store the message ID of the summary we just sent
-					// This enables more accurate reaction-based cleanup tracking
-					$this->roomConfigService->findAndStoreRecentSummaryMessageId($token);
+				// Check auto-behaviors configuration for summary and cleanup settings
+				$autoConfig = $this->roomConfigService->getAutoBehaviorsConfig($token);
+				
+				// Generate summary only if auto-summary is enabled
+				if ($autoConfig['summary']) {
+					$summary = $this->summaryService->generateAgendaSummary($token, $data['target']['name'], $lang);
+					if ($summary !== null) {
+						$event->addAnswer($summary['summary'], false);
+						
+						// Try to find and store the message ID of the summary we just sent
+						// This enables more accurate reaction-based cleanup tracking
+						$this->roomConfigService->findAndStoreRecentSummaryMessageId($token);
+					}
+				}
+				
+				// Auto-cleanup completed items if enabled (after summary generation)
+				if ($autoConfig['cleanup']) {
+					$cleanupResult = $this->agendaService->removeCompletedItems($token, null, $lang);
+					if ($cleanupResult && !str_contains($cleanupResult, 'No completed items to remove')) {
+						// Send cleanup result as a separate message (emoji already included)
+						$event->addAnswer($cleanupResult, true);
+					}
 				}
 			}
 		}
@@ -370,13 +383,6 @@ class BotInvokeListener implements IEventListener {
 		// Get stored room language for localized messages
 		$roomLanguage = $this->roomConfigService->getRoomLanguage($token) ?? 'en';
 		
-		$this->logger->info('Processing cleanup reaction', [
-			'token' => $token,
-			'reaction' => $reaction,
-			'actor' => $actorData['name'] ?? 'unknown',
-			'room_language' => $roomLanguage
-		]);
-		
 		// For reaction-triggered cleanup, bypass permission check since:
 		// 1. Only users with conversation access can react to messages
 		// 2. Reactions are typically made by moderators/owners managing the meeting
@@ -458,7 +464,7 @@ class BotInvokeListener implements IEventListener {
 				return $result['message'];
 
 			case 'time_reset':
-				// Reset room config by deleting it (will fallback to global config)
+				// Reset time monitoring config only (not entire room config)
 				$l = $this->l10nFactory->get(Application::APP_ID, $lang);
 				
 				// Check moderator permissions
@@ -466,16 +472,42 @@ class BotInvokeListener implements IEventListener {
 					return $this->permissionService->getPermissionDeniedMessage($l->t('configure time monitoring settings'), $lang);
 				}
 				
-				// Call reset method via RoomConfigService
-				$reset = $this->roomConfigService->resetRoomConfig($command['token']);
+				// Call specific time monitoring reset method
+				$reset = $this->roomConfigService->resetTimeMonitoringConfig($command['token']);
 				if ($reset) {
 					return '✅ ' . $l->t('Room time monitoring reset to global defaults');
 				} else {
-					return 'ℹ️ ' . $l->t('Room configuration not found') . ' - ' . $l->t('This room is using global defaults. Use time commands to set room-specific configuration.');
+					return 'ℹ️ ' . $l->t('No time monitoring configuration found') . ' - ' . $l->t('This room is using global defaults. Use time commands to set room-specific configuration.');
 				}
 
 			case 'cleanup':
 				return $this->agendaService->removeCompletedItems($command['token'], $actorData ?: null, $lang);
+
+			// Unified config commands
+			case 'config_show':
+				return $this->handleConfigShow($command['token'], $actorData ?: null, $lang);
+
+			case 'config_time':
+				return $this->handleConfigTime(
+					$command['token'], 
+					$command['action'] ?? 'show', 
+					$command['param1'] ?? null, 
+					$command['param2'] ?? null, 
+					$actorData ?: null, 
+					$lang
+				);
+
+			case 'config_response':
+				return $this->handleConfigResponse($command['token'], $command['action'] ?? 'show', $actorData ?: null, $lang);
+
+			case 'config_limits':
+				return $this->handleConfigLimits($command['token'], $command['action'] ?? 'show', $command['param1'] ?? null, $actorData ?: null, $lang);
+
+			case 'config_auto':
+				return $this->handleConfigAuto($command['token'], $command['action'] ?? 'show', $command['param1'] ?? null, $actorData ?: null, $lang);
+
+			case 'config_emojis':
+				return $this->handleConfigEmojis($command['token'], $command['action'] ?? 'show', $command['param1'] ?? null, $command['param2'] ?? null, $actorData ?: null, $lang);
 
 			default:
 				return null;
@@ -511,5 +543,519 @@ class BotInvokeListener implements IEventListener {
 			return $data['object']['id'];
 		}
 		return null;
+	}
+
+	/**
+	 * Handle config show command - display all room configuration
+	 */
+	private function handleConfigShow(string $token, ?array $actorData, string $lang): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
+		// Get all configuration areas
+		$timeConfig = $this->roomConfigService->getTimeMonitoringConfig($token);
+		$responseConfig = $this->roomConfigService->getResponseConfig($token);
+		$limitsConfig = $this->roomConfigService->getAgendaLimitsConfig($token);
+		$autoConfig = $this->roomConfigService->getAutoBehaviorsConfig($token);
+		$emojisConfig = $this->roomConfigService->getEmojisConfig($token);
+		
+		$output = "### ⚙️ " . $l->t('Room Configuration') . "\n";
+		
+		// Time monitoring section
+		$output .= "\n##### 🕙 " . $l->t('Time Monitoring') . "\n";
+		$output .= "• **" . $l->t('Status') . "**: " . ($timeConfig['enabled'] ? "✅ " . $l->t('Enabled') : "❌ " . $l->t('Disabled')) . "\n";
+		$output .= "• **" . $l->t('Warning threshold') . "**: " . round($timeConfig['warning_threshold'] * 100) . "% " . $l->t('of planned time') . "\n";
+		$output .= "• **" . $l->t('Overtime threshold') . "**: " . round($timeConfig['overtime_threshold'] * 100) . "% " . $l->t('of planned time') . "\n";
+		
+		if ($timeConfig['source'] === 'room' && ($timeConfig['configured_by'] ?? null)) {
+			$configDate = date('Y-m-d H:i', $timeConfig['configured_at'] ?? time());
+			$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . $timeConfig['configured_by'] . " (" . $configDate . ")\n";
+		} else {
+			$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
+		}
+		$output .= "💡 " . $l->t('Use `config time` for time configuration help') . "\n";
+		
+		// Response settings section
+		$output .= "\n##### 💬 " . $l->t('Response') . "\n";
+		if ($responseConfig['response_mode'] === 'minimal') {
+			$output .= "• **" . $l->t('Response mode') . "**: 😴 " . $l->t('Minimal mode') . " — " . $l->t('Emoji reactions only') . "\n";
+			$output .= "• **" . $l->t('Text responses') . "**: " . $l->t('Only for help, status, and call notifications') . "\n";
+		} else {
+			$output .= "• **" . $l->t('Response mode') . "**: 💬 " . $l->t('Normal mode') . " — " . $l->t('Full text responses') . "\n";
+			$output .= "• **" . $l->t('Text responses') . "**: " . $l->t('For all commands and operations') . "\n";
+		}
+		
+		if ($responseConfig['source'] === 'room' && ($responseConfig['configured_by'] ?? null)) {
+			$configDate = date('Y-m-d H:i', $responseConfig['configured_at'] ?? time());
+			$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . ($responseConfig['configured_by'] ?? 'Unknown') . " (" . $configDate . ")\n";
+		} else {
+			$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
+		}
+		$output .= "💡 " . $l->t('Use `config response` for response configuration help') . "\n";
+		
+		// Agenda limits section
+		$output .= "\n##### 🚧 " . $l->t('Agenda Limits') . "\n";
+		$output .= "• **" . $l->t('Max total items') . "**: " . $limitsConfig['max_items'] . " " . $l->t('items') . "\n";
+		$output .= "• **" . $l->t('Max bulk operation') . "**: " . $limitsConfig['max_bulk_items'] . " " . $l->t('items') . "\n";
+		$output .= "• **" . $l->t('Default item duration') . "**: " . $limitsConfig['default_duration'] . " " . $l->t('minutes') . "\n";
+		
+		if ($limitsConfig['source'] === 'room' && ($limitsConfig['configured_by'] ?? null)) {
+			$configDate = date('Y-m-d H:i', $limitsConfig['configured_at'] ?? time());
+			$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . $limitsConfig['configured_by'] . " (" . $configDate . ")\n";
+		} else {
+			$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
+		}
+		$output .= "💡 " . $l->t('Use `config limits` for limits configuration help') . "\n";
+		
+		// Auto-behaviors section
+		$output .= "\n##### 🤖 " . $l->t('Auto-behaviors') . "\n";
+		$output .= "• **" . $l->t('Start agenda on call') . "**: " . ($autoConfig['start_agenda'] ? "✅ " . $l->t('Enabled') : "❌ " . $l->t('Disabled')) . "\n";
+		$output .= "• **" . $l->t('Auto-cleanup completed') . "**: " . ($autoConfig['cleanup'] ? "✅ " . $l->t('Enabled') : "❌ " . $l->t('Disabled')) . "\n";
+		$output .= "• **" . $l->t('Generate summaries') . "**: " . ($autoConfig['summary'] ? "✅ " . $l->t('Enabled') : "❌ " . $l->t('Disabled')) . "\n";
+		
+		if ($autoConfig['source'] === 'room' && ($autoConfig['configured_by'] ?? null)) {
+			$configDate = date('Y-m-d H:i', $autoConfig['configured_at'] ?? time());
+			$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . $autoConfig['configured_by'] . " (" . $configDate . ")\n";
+		} else {
+			$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
+		}
+		$output .= "💡 " . $l->t('Use `config auto` for auto-behaviors configuration help') . "\n";
+		
+		// Custom emojis section
+		$output .= "\n##### 😀 " . $l->t('Custom Emojis') . "\n";
+		$output .= "• **" . $l->t('Current agenda item') . "**: " . $emojisConfig['current_item'] . "\n";
+		$output .= "• **" . $l->t('Completed agenda item') . "**: " . $emojisConfig['completed'] . "\n";
+		$output .= "• **" . $l->t('Pending agenda item') . "**: " . $emojisConfig['pending'] . "\n";
+		$output .= "• **" . $l->t('On time icon') . "**: " . $emojisConfig['on_time'] . "\n";
+		$output .= "• **" . $l->t('Time warning icon') . "**: " . $emojisConfig['time_warning'] . "\n";
+		
+		if ($emojisConfig['source'] === 'room' && ($emojisConfig['configured_by'] ?? null)) {
+			$configDate = date('Y-m-d H:i', $emojisConfig['configured_at'] ?? time());
+			$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . $emojisConfig['configured_by'] . " (" . $configDate . ")\n";
+		} else {
+			$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
+		}
+		$output .= "💡 " . $l->t('Use `config emojis` for custom emojis configuration help') . "\n";
+		
+		$output .= "\n---\n";
+		$output .= "🔒 " . $l->t('Only moderators and owners can modify room configuration') . "\n";
+		
+		return $output;
+	}
+
+	/**
+	 * Handle config limits command - display/configure agenda limits
+	 */
+	private function handleConfigLimits(string $token, string $action, ?int $param1, ?array $actorData, string $lang): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
+		switch ($action) {
+			case 'show':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('view detailed limits configuration'), $lang);
+				}
+				$limitsConfig = $this->roomConfigService->getAgendaLimitsConfig($token);
+				$output = "### 🚧 " . $l->t('Agenda Limits Configuration') . "\n\n";
+				$output .= "• **" . $l->t('Max total items') . "**: " . $limitsConfig['max_items'] . " " . $l->t('items') . "\n";
+				$output .= "• **" . $l->t('Max bulk operation') . "**: " . $limitsConfig['max_bulk_items'] . " " . $l->t('items') . "\n";
+				$output .= "• **" . $l->t('Default item duration') . "**: " . $limitsConfig['default_duration'] . " " . $l->t('minutes') . "\n";
+				
+				if ($limitsConfig['source'] === 'room' && ($limitsConfig['configured_by'] ?? null)) {
+					$configDate = date('Y-m-d H:i', $limitsConfig['configured_at'] ?? time());
+					$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . $limitsConfig['configured_by'] . " (" . $configDate . ")\n";
+				} else {
+					$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
+				}
+				
+				$output .= "\n---\n";
+				$output .= "💡 **" . $l->t('Available Commands') . ":**\n";
+				$output .= "• `config limits max-items 30` — " . $l->t('Set maximum total agenda items (5-100)') . "\n";
+				$output .= "• `config limits max-bulk 15` — " . $l->t('Set maximum bulk operation items (3-50)') . "\n";
+				$output .= "• `config limits default-duration 15` — " . $l->t('Set default item duration in minutes (1-120)') . "\n";
+				$output .= "• `config limits reset` — " . $l->t('Reset limits to global defaults') . "\n";
+				$output .= "\n🔒 " . $l->t('Only moderators/owners can change agenda limits') . "\n";
+				
+				return $output;
+				
+			case 'max-items':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('configure agenda limits'), $lang);
+				}
+				$userId = $this->extractUserIdFromActorData($actorData);
+				$this->roomConfigService->setAgendaLimitsConfig($token, ['max_items' => $param1], $userId);
+				return "✅ " . $l->t('Maximum total items set to: %d', [$param1]);
+				
+			case 'max-bulk':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('configure agenda limits'), $lang);
+				}
+				$userId = $this->extractUserIdFromActorData($actorData);
+				$this->roomConfigService->setAgendaLimitsConfig($token, ['max_bulk_items' => $param1], $userId);
+				return "✅ " . $l->t('Maximum bulk operation items set to: %d', [$param1]);
+				
+			case 'default-duration':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('configure agenda limits'), $lang);
+				}
+				$userId = $this->extractUserIdFromActorData($actorData);
+				$this->roomConfigService->setAgendaLimitsConfig($token, ['default_duration' => $param1], $userId);
+				return "✅ " . $l->t('Default item duration set to: %d minutes', [$param1]);
+				
+			case 'reset':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('reset agenda limits'), $lang);
+				}
+				$resetSuccess = $this->roomConfigService->resetAgendaLimitsConfig($token);
+				if ($resetSuccess) {
+					return "✅ " . $l->t('Agenda limits reset to global defaults');
+				} else {
+					return "ℹ️ " . $l->t('No custom agenda limits configuration found') . " - " . $l->t('Using global defaults');
+				}
+				
+			default:
+		return "❌ " . $l->t('Unknown limits action') . ": " . $action;
+		}
+	}
+
+	/**
+	 * Extract user ID from actor data
+	 */
+	private function extractUserIdFromActorData(?array $actorData): string {
+		if (!$actorData) {
+			return 'system';
+		}
+		$rawUserId = $actorData['id'] ?? ($actorData['name'] ?? 'unknown');
+		return $this->cleanUserId($rawUserId);
+	}
+	
+	/**
+	 * Clean user ID by removing common prefixes like 'users/', 'guests/', etc.
+	 */
+	private function cleanUserId(string $rawUserId): string {
+		// Remove common prefixes that might be present in actor data
+		if (str_starts_with($rawUserId, 'users/')) {
+			return substr($rawUserId, 6); // Remove 'users/' prefix
+		}
+		if (str_starts_with($rawUserId, 'guests/')) {
+			return substr($rawUserId, 7); // Remove 'guests/' prefix
+		}
+		if (str_starts_with($rawUserId, 'emails/')) {
+			return substr($rawUserId, 7); // Remove 'emails/' prefix
+		}
+		if (str_starts_with($rawUserId, 'federated_users/')) {
+			return substr($rawUserId, 16); // Remove 'federated_users/' prefix
+		}
+		
+		return $rawUserId; // Return as-is if no known prefix
+	}
+
+	/**
+	 * Handle config auto command - basic implementation
+	 */
+	private function handleConfigAuto(string $token, string $action, $param1, ?array $actorData, string $lang): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
+		switch ($action) {
+			case 'show':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('view detailed auto-behaviors configuration'), $lang);
+				}
+				$autoConfig = $this->roomConfigService->getAutoBehaviorsConfig($token);
+				$output = "### 🤖 " . $l->t('Auto-behaviors Configuration') . "\n\n";
+				$output .= "• **" . $l->t('Start agenda on call') . "**: " . ($autoConfig['start_agenda'] ? "✅ " . $l->t('Enabled') : "❌ " . $l->t('Disabled')) . "\n";
+				$output .= "• **" . $l->t('Auto-cleanup completed') . "**: " . ($autoConfig['cleanup'] ? "✅ " . $l->t('Enabled') : "❌ " . $l->t('Disabled')) . "\n";
+				$output .= "• **" . $l->t('Generate summaries') . "**: " . ($autoConfig['summary'] ? "✅ " . $l->t('Enabled') : "❌ " . $l->t('Disabled')) . "\n";
+				
+				if ($autoConfig['source'] === 'room' && ($autoConfig['configured_by'] ?? null)) {
+					$configDate = date('Y-m-d H:i', $autoConfig['configured_at'] ?? time());
+					$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . $autoConfig['configured_by'] . " (" . $configDate . ")\n";
+				} else {
+					$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
+				}
+				
+				$output .= "\n---\n";
+				$output .= "💡 **" . $l->t('Available Commands') . ":**\n";
+				$output .= "• `config auto start-agenda enable` — " . $l->t('Auto-set first item as current on call start') . "\n";
+				$output .= "• `config auto start-agenda disable` — " . $l->t('Disable auto-start agenda behavior') . "\n";
+				$output .= "• `config auto cleanup enable` — " . $l->t('Auto-remove completed items') . "\n";
+				$output .= "• `config auto cleanup disable` — " . $l->t('Disable auto-cleanup behavior') . "\n";
+				$output .= "• `config auto summary enable` — " . $l->t('Generate summaries on call end') . "\n";
+				$output .= "• `config auto summary disable` — " . $l->t('Disable automatic summary generation') . "\n";
+				$output .= "• `config auto reset` — " . $l->t('Reset auto-behaviors to global defaults') . "\n";
+				$output .= "\n🔒 " . $l->t('Only moderators/owners can change auto-behaviors') . "\n";
+				
+				return $output;
+				
+			case 'start-agenda':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('configure auto-behaviors'), $lang);
+				}
+				$userId = $this->extractUserIdFromActorData($actorData);
+				$this->roomConfigService->setAutoBehaviorsConfig($token, ['start_agenda' => $param1], $userId);
+				return "✅ " . $l->t('Auto-start agenda on call: %s', [$param1 ? $l->t('Enabled') : $l->t('Disabled')]);
+				
+			case 'cleanup':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('configure auto-behaviors'), $lang);
+				}
+				$userId = $this->extractUserIdFromActorData($actorData);
+				$this->roomConfigService->setAutoBehaviorsConfig($token, ['cleanup' => $param1], $userId);
+				return "✅ " . $l->t('Auto-cleanup completed items: %s', [$param1 ? $l->t('Enabled') : $l->t('Disabled')]);
+				
+			case 'summary':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('configure auto-behaviors'), $lang);
+				}
+				$userId = $this->extractUserIdFromActorData($actorData);
+				$this->roomConfigService->setAutoBehaviorsConfig($token, ['summary' => $param1], $userId);
+				return "✅ " . $l->t('Auto-generate summaries: %s', [$param1 ? $l->t('Enabled') : $l->t('Disabled')]);
+				
+			case 'reset':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('reset auto-behaviors'), $lang);
+				}
+				$resetSuccess = $this->roomConfigService->resetAutoBehaviorsConfig($token);
+				if ($resetSuccess) {
+					return "✅ " . $l->t('Auto-behaviors reset to global defaults');
+				} else {
+					return "ℹ️ " . $l->t('No custom auto-behaviors configuration found') . " - " . $l->t('Using global defaults');
+				}
+				
+			default:
+				return "❌ " . $l->t('Unknown auto-behaviors action') . ": " . $action;
+		}
+	}
+
+	/**
+	 * Handle config emojis command - basic implementation
+	 */
+	private function handleConfigEmojis(string $token, string $action, $param1, $param2, ?array $actorData, string $lang): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
+		switch ($action) {
+			case 'show':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('view detailed emojis configuration'), $lang);
+				}
+				$emojisConfig = $this->roomConfigService->getEmojisConfig($token);
+				$output = "### 😀 " . $l->t('Custom Emojis Configuration') . "\n\n";
+				$output .= "• **" . $l->t('Current agenda item') . "**: " . $emojisConfig['current_item'] . "\n";
+				$output .= "• **" . $l->t('Completed agenda item') . "**: " . $emojisConfig['completed'] . "\n";
+				$output .= "• **" . $l->t('Pending agenda item') . "**: " . $emojisConfig['pending'] . "\n";
+				$output .= "• **" . $l->t('On time icon') . "**: " . $emojisConfig['on_time'] . "\n";
+				$output .= "• **" . $l->t('Time warning icon') . "**: " . $emojisConfig['time_warning'] . "\n";
+				
+				if ($emojisConfig['source'] === 'room' && ($emojisConfig['configured_by'] ?? null)) {
+					$configDate = date('Y-m-d H:i', $emojisConfig['configured_at'] ?? time());
+					$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . $emojisConfig['configured_by'] . " (" . $configDate . ")\n";
+				} else {
+					$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
+				}
+				
+				$output .= "\n---\n";
+				$output .= "💡 **" . $l->t('Available Commands') . ":**\n";
+				$output .= "• `config emojis current-item 🎯` — " . $l->t('Set emoji for current agenda item') . "\n";
+				$output .= "• `config emojis completed ✔️` — " . $l->t('Set emoji for completed items') . "\n";
+				$output .= "• `config emojis pending ⏳` — " . $l->t('Set emoji for pending items') . "\n";
+				$output .= "• `config emojis on-time 👌` — " . $l->t('Set emoji for on-time status') . "\n";
+				$output .= "• `config emojis time-warning ⚠️` — " . $l->t('Set emoji for time warnings') . "\n";
+				$output .= "• `config emojis reset` — " . $l->t('Reset emojis to global defaults') . "\n";
+				$output .= "\n🔒 " . $l->t('Only moderators/owners can change custom emojis') . "\n";
+				
+				return $output;
+				
+			case 'set':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('configure custom emojis'), $lang);
+				}
+				$emojiKeyMap = [
+					'current-item' => 'current_item',
+					'completed' => 'completed',
+					'pending' => 'pending',
+					'on-time' => 'on_time',
+					'time-warning' => 'time_warning',
+				];
+				if (!isset($emojiKeyMap[$param1])) {
+					return "❌ " . $l->t('Unknown emoji type') . ": " . $param1;
+				}
+				$configKey = $emojiKeyMap[$param1];
+				$userId = $this->extractUserIdFromActorData($actorData);
+				$this->roomConfigService->setEmojisConfig($token, [$configKey => $param2], $userId);
+				return "✅ " . $l->t('Emoji for \"%s\" set to: %s', [str_replace('-', ' ', $param1), $param2]);
+				
+			case 'reset':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('reset custom emojis'), $lang);
+				}
+				$resetSuccess = $this->roomConfigService->resetEmojisConfig($token);
+				if ($resetSuccess) {
+					return "✅ " . $l->t('Custom emojis reset to global defaults');
+				} else {
+					return "ℹ️ " . $l->t('No custom emojis configuration found') . " - " . $l->t('Using global defaults');
+				}
+				
+			default:
+				return "❌ " . $l->t('Unknown emojis action') . ": " . $action;
+		}
+	}
+
+	/**
+	 * Handle config time command - time monitoring configuration
+	 */
+	private function handleConfigTime(string $token, string $action, $param1, $param2, ?array $actorData, string $lang): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
+		switch ($action) {
+			case 'show':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('view detailed time monitoring configuration'), $lang);
+				}
+				$timeConfig = $this->roomConfigService->getTimeMonitoringConfig($token);
+				$output = "### 🕙 " . $l->t('Time Monitoring Configuration') . "\n\n";
+				$output .= "• **" . $l->t('Status') . "**: " . ($timeConfig['enabled'] ? "✅ " . $l->t('Enabled') : "❌ " . $l->t('Disabled')) . "\n";
+				$output .= "• **" . $l->t('Warning threshold') . "**: " . round($timeConfig['warning_threshold'] * 100) . "% " . $l->t('of planned time') . "\n";
+				$output .= "• **" . $l->t('Overtime threshold') . "**: " . round($timeConfig['overtime_threshold'] * 100) . "% " . $l->t('of planned time') . "\n";
+				
+				if ($timeConfig['source'] === 'room' && ($timeConfig['configured_by'] ?? null)) {
+					$configDate = date('Y-m-d H:i', $timeConfig['configured_at'] ?? time());
+					$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . $timeConfig['configured_by'] . " (" . $configDate . ")\n";
+				} else {
+					$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
+				}
+				
+				$output .= "\n---\n";
+				$output .= "💡 **" . $l->t('Available Commands') . ":**\n";
+				$output .= "• `config time enable` — " . $l->t('Enable time monitoring for this room') . "\n";
+				$output .= "• `config time disable` — " . $l->t('Disable time monitoring for this room') . "\n";
+				$output .= "• `config time warning 75` — " . $l->t('Set warning at 75% of planned time') . "\n";
+				$output .= "• `config time overtime 120` — " . $l->t('Set overtime alert at 120% of planned time') . "\n";
+				$output .= "• `config time thresholds 75 120` — " . $l->t('Set both warning and overtime thresholds') . "\n";
+				$output .= "• `config time reset` — " . $l->t('Reset time monitoring to global defaults') . "\n";
+				$output .= "\n🔒 " . $l->t('Only moderators/owners can change time monitoring settings') . "\n";
+				
+				return $output;
+				
+			case 'enable':
+			case 'disable':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('configure time monitoring settings'), $lang);
+				}
+				$enabled = $action === 'enable';
+				$userId = $this->extractUserIdFromActorData($actorData);
+				$this->roomConfigService->setRoomTimeMonitoringConfig($token, ['enabled' => $enabled], $userId);
+				return "✅ " . $l->t('Time monitoring: %s', [$enabled ? $l->t('Enabled') : $l->t('Disabled')]);
+				
+			case 'warning':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('configure time monitoring settings'), $lang);
+				}
+				$threshold = ($param1 ?? 80) / 100.0;
+				$userId = $this->extractUserIdFromActorData($actorData);
+				$this->roomConfigService->setRoomTimeMonitoringConfig($token, ['warning_threshold' => $threshold], $userId);
+				return "✅ " . $l->t('Warning threshold set to: %d%%', [$param1]);
+				
+			case 'overtime':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('configure time monitoring settings'), $lang);
+				}
+				$threshold = ($param1 ?? 120) / 100.0;
+				$userId = $this->extractUserIdFromActorData($actorData);
+				$this->roomConfigService->setRoomTimeMonitoringConfig($token, ['overtime_threshold' => $threshold], $userId);
+				return "✅ " . $l->t('Overtime threshold set to: %d%%', [$param1]);
+				
+			case 'thresholds':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('configure time monitoring settings'), $lang);
+				}
+				$config = [
+					'warning_threshold' => ($param1 ?? 80) / 100.0,
+					'overtime_threshold' => ($param2 ?? 120) / 100.0
+				];
+				$userId = $this->extractUserIdFromActorData($actorData);
+				$this->roomConfigService->setRoomTimeMonitoringConfig($token, $config, $userId);
+				return "✅ " . $l->t('Thresholds set to: %d%% warning, %d%% overtime', [$param1, $param2]);
+				
+			case 'reset':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('configure time monitoring settings'), $lang);
+				}
+				$resetSuccess = $this->roomConfigService->resetTimeMonitoringConfig($token);
+				if ($resetSuccess) {
+					return "✅ " . $l->t('Time monitoring reset to global defaults');
+				} else {
+					return "ℹ️ " . $l->t('No time monitoring configuration found') . " - " . $l->t('Using global defaults');
+				}
+				
+			default:
+				return "❌ " . $l->t('Unknown time monitoring action') . ": " . $action;
+		}
+	}
+
+	/**
+	 * Handle config response command - response behavior configuration
+	 */
+	private function handleConfigResponse(string $token, string $action, ?array $actorData, string $lang): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
+		switch ($action) {
+			case 'show':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('view detailed response configuration'), $lang);
+				}
+				$responseConfig = $this->roomConfigService->getResponseConfig($token);
+				$output = "### 💬 " . $l->t('Response Configuration') . "\n\n";
+				if ($responseConfig['response_mode'] === 'minimal') {
+					$output .= "• **" . $l->t('Response mode') . "**: 😴 " . $l->t('Minimal mode') . " — " . $l->t('Emoji reactions only') . "\n";
+					$output .= "• **" . $l->t('Text responses') . "**: " . $l->t('Only for help, status, and call notifications') . "\n";
+				} else {
+					$output .= "• **" . $l->t('Response mode') . "**: 💬 " . $l->t('Normal mode') . " — " . $l->t('Full text responses') . "\n";
+					$output .= "• **" . $l->t('Text responses') . "**: " . $l->t('For all commands and operations') . "\n";
+				}
+				
+				if ($responseConfig['source'] === 'room' && ($responseConfig['configured_by'] ?? null)) {
+					$configDate = date('Y-m-d H:i', $responseConfig['configured_at'] ?? time());
+					$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . $responseConfig['configured_by'] . " (" . $configDate . ")\n";
+				} else {
+					$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
+				}
+				
+				$output .= "\n---\n";
+				$output .= "💡 **" . $l->t('Available Commands') . ":**\n";
+				$output .= "• `config response normal` — " . $l->t('Enable full text responses') . "\n";
+				$output .= "• `config response minimal` — " . $l->t('Enable minimal responses (reduce notifications)') . "\n";
+				$output .= "• `config response reset` — " . $l->t('Reset to default settings') . "\n";
+				$output .= "\n🔒 " . $l->t('Only moderators/owners can change response settings') . "\n";
+				
+				return $output;
+				
+			case 'normal':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('configure response settings'), $lang);
+				}
+				$userId = $this->extractUserIdFromActorData($actorData);
+				$this->roomConfigService->setResponseConfig($token, ['response_mode' => 'normal'], $userId);
+				return "✅ " . $l->t('Response mode set to: Normal (full responses)');
+				
+			case 'minimal':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('configure response settings'), $lang);
+				}
+				$userId = $this->extractUserIdFromActorData($actorData);
+				$this->roomConfigService->setResponseConfig($token, ['response_mode' => 'minimal'], $userId);
+				return "✅ " . $l->t('Response mode set to: Minimal (reduced notifications)');
+				
+			case 'reset':
+				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+					return $this->permissionService->getPermissionDeniedMessage($l->t('reset response settings'), $lang);
+				}
+				$resetSuccess = $this->roomConfigService->resetResponseConfig($token);
+				if ($resetSuccess) {
+					return "✅ " . $l->t('Response settings reset to global defaults');
+				} else {
+					return "ℹ️ " . $l->t('No custom response configuration found') . " - " . $l->t('Using global defaults');
+				}
+				
+			default:
+				return "❌ " . $l->t('Unknown response action') . ": " . $action;
+		}
 	}
 }

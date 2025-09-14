@@ -2,11 +2,13 @@
 
 🤖 **A specialized bot for intelligent meeting agenda management and real-time time tracking during Nextcloud Talk calls.**
 
-⚡ **NEW in v1.3.0: Bulk Agenda Creation!** For quickly importing existing agendas from calendar invitations or meeting templates.
+🎆 **NEW in v1.4.0: Complete Room-Level Bot Configuration!** Transform each Talk room into a perfectly customized meeting assistant with 5 comprehensive configuration areas.
 
-⏰ **Room-Level Time Monitoring!** Each Talk room can have custom time monitoring settings with configurable warning thresholds.
+⚡ **v1.3.0 introduced Bulk Agenda Creation** - Import existing agendas from calendar invitations or meeting templates.
 
-🌍 **Now with multi-language support!** Available in English and German, with more languages coming soon.
+⏰ **v1.2.0 introduced Advanced Time Monitoring** - Room-specific time tracking with custom warning thresholds and intelligent automation.
+
+🌍 **v1.1.0 introduced Multi-language Support** - Available in English and German, with complete localization for all features.
 
 
 ## Overview
@@ -18,20 +20,30 @@ The Agenda Bot is a comprehensive Nextcloud app that transforms how teams manage
 
 ## Key Features
 
+### ⚙️ **Room-Level Bot Configuration (NEW in v1.4.0)**
+- **Complete Customization** - Five comprehensive configuration areas for personalized room experiences
+- **Time Monitoring Config** - Custom warning thresholds, overtime alerts, and monitoring controls per room
+- **Response Behavior** - Choose between full text responses or minimal emoji-only mode to reduce notifications
+- **Agenda Limits** - Configure max items (5-100), bulk operations (3-50), and default durations (1-120 min)
+- **Auto-behaviors** - Control automatic start, cleanup, and summary generation behaviors
+- **Custom Emojis** - Personalize agenda item status indicators with room-specific emoji sets
+- **Unified Interface** - Simple `config show` command displays complete room configuration overview
+- **Smart Inheritance** - Room settings override global defaults with intelligent fallback
+
 ### 📋 **Advanced Agenda Management**
 - **Flexible item creation** - Natural syntax with multiple formats (`agenda:`, `topic:`, `item:`, `add:`, `insert:`)
-- **Bulk agenda import** - Create multiple items at once from structured lists (v1.3.0)
+- **Bulk agenda import** - Create multiple items at once from structured lists
 - **Intelligent time parsing** - Supports various duration formats: `(5 min)`, `(1h)`, `(2 hours)`, `(90 min)`
 - **Smart positioning** - Automatic position assignment or manual positioning with `#2.` syntax
 - **Complete item lifecycle** - Add, reorder, mark complete/incomplete, remove items
 - **Real-time status tracking** - Current item highlighting with time spent vs. planned
 
 ### ⏰ **Intelligent Time Monitoring**
-- **Background monitoring** - Automated time tracking via background job
-- **Room-level configuration** - Individual time monitoring settings per Talk room
-- **Global fallback** - Rooms without specific settings use global defaults
-- **Configurable warnings** - Custom warning and overtime threshold alerts per room
-- **Call-aware notifications** - Only sends alerts during active calls
+- **Room-specific configuration** - Individual time monitoring settings per Talk room with `config time` commands
+- **Custom thresholds** - Configurable warning (10-95%) and overtime (105-300%) thresholds per room  
+- **Background monitoring** - Automated time tracking via background job with call-aware notifications
+- **Flexible control** - Enable/disable monitoring per room without affecting other rooms
+- **Global fallback** - Rooms without specific settings use global defaults with seamless inheritance
 - **Time analytics** - Actual vs. planned duration tracking with visual indicators
 - **Meeting efficiency insights** - Completion rates and timing statistics
 
@@ -49,8 +61,8 @@ The Agenda Bot is a comprehensive Nextcloud app that transforms how teams manage
 
 ### 🌍 **Multi-Language Support**
 - **Separate language bots** - Choose your preferred language when adding the bot
-- **Complete localization** - All messages, commands, and responses in your language
-- **Currently supported**: English (en), German (de)
+- **Complete localization** - All messages, commands, and configuration options in your language  
+- **Currently supported**: English (en), German (de) with 200+ translation keys each
 - **Automatic language detection** - Bot responds in the appropriate language
 - **Nextcloud l10n standards** - Following official internationalization guidelines
 
@@ -169,15 +181,22 @@ agenda:
 | `move: X to Y` | Move item X to position Y | Moderators, Owners | `move: 3 to 1` |
 | `swap: X,Y` | Swap positions of items X and Y | Moderators, Owners | `swap: 1,3` |
 
-#### Room-Level Time Management (NEW in v1.2.0)
+#### Room-Level Bot Configuration (NEW in v1.4.0)
 | Command | Description | Permissions | Example |
 |---------|-------------|-------------|----------|
-| `time config` | Show room time monitoring settings | Moderators, Owners | `time config` |
-| `time enable` / `time disable` | Toggle time monitoring for this room | Moderators, Owners | `time enable` |
-| `time warning 75` | Set time limit warning threshold (%) for room | Moderators, Owners | `time warning 75` |
-| `time overtime 110` | Set overtime alert threshold (%) for room | Moderators, Owners | `time overtime 110` |
-| `time thresholds 80 120` | Set both thresholds (warning, overtime) | Moderators, Owners | `time thresholds 70 110` |
-| `time reset` | Reset room to global time monitoring defaults | Moderators, Owners | `time reset` |
+| `config show` | **Display complete room configuration overview** | All participants | `config show` |
+| `config time` | Show/configure time monitoring settings | Moderators, Owners | `config time` |
+| `config time enable/disable` | Toggle time monitoring for this room | Moderators, Owners | `config time enable` |
+| `config time warning X` | Set warning threshold (10-95%) | Moderators, Owners | `config time warning 75` |
+| `config time overtime X` | Set overtime threshold (105-300%) | Moderators, Owners | `config time overtime 110` |
+| `config time thresholds X Y` | Set both warning and overtime thresholds | Moderators, Owners | `config time thresholds 70 110` |
+| `config time reset` | Reset time monitoring to global defaults | Moderators, Owners | `config time reset` |
+| `config response normal/minimal` | **Switch between full/minimal response modes** | Moderators, Owners | `config response minimal` |
+| `config limits max-items X` | Set maximum agenda items (5-100) | Moderators, Owners | `config limits max-items 30` |
+| `config limits default-duration X` | Set default item duration (1-120 min) | Moderators, Owners | `config limits default-duration 15` |
+| `config auto start-agenda enable` | **Auto-start agenda on call begin** | Moderators, Owners | `config auto start-agenda enable` |
+| `config auto cleanup enable` | Auto-remove completed items after meeting | Moderators, Owners | `config auto cleanup enable` |
+| `config emojis current-item 🎯` | **Customize agenda item status emojis** | Moderators, Owners | `config emojis completed 🎉` |
 
 ### Example Workflow
 
@@ -271,27 +290,56 @@ The Agenda Bot uses the `oc_ab_log_entries` table for all data storage, includin
 - `ab_completion_status` - (token, type, is_completed)
 - `ab_agenda_order` - (token, order_position)
 
-### Room Configuration Storage ⚡ Smart Design in v1.2.0
+### Room Configuration Storage ⚡ Enhanced in v1.4.0
 
-Room configurations are stored as `room_config` entries in the existing table:
+Room configurations are stored as `room_config` entries with comprehensive JSON structure:
 
 ```json
 {
   "time_monitoring": {
     "enabled": true,
-    "warning_threshold": 0.8,
-    "overtime_threshold": 1.2
+    "warning_threshold": 0.75,
+    "overtime_threshold": 1.1,
+    "configured_by": "user123",
+    "configured_at": 1694618400
   },
-  "configured_by": "user123",
-  "configured_at": 1693872000
+  "response_settings": {
+    "response_mode": "minimal",
+    "configured_by": "user123",
+    "configured_at": 1694618400
+  },
+  "agenda_limits": {
+    "max_items": 30,
+    "max_bulk_items": 15,
+    "default_duration": 15,
+    "configured_by": "user123",
+    "configured_at": 1694618400
+  },
+  "auto_behaviors": {
+    "start_agenda": true,
+    "cleanup": false,
+    "summary": true,
+    "configured_by": "user123",
+    "configured_at": 1694618400
+  },
+  "custom_emojis": {
+    "current_item": "🎯",
+    "completed": "🎉",
+    "pending": "📋",
+    "on_time": "👍",
+    "time_warning": "⚠️",
+    "configured_by": "user123",
+    "configured_at": 1694618400
+  }
 }
 ```
 
-**Benefits:**
-- ✨ **Zero schema changes** - Uses existing table structure
-- 🚀 **Instant deployment** - No migrations required
-- 🔄 **Backward compatible** - Existing setups unaffected
-- ⚡ **Efficient queries** - Existing indexes support room config lookups
+**v1.4.0 Benefits:**
+- 🎆 **5 Configuration Areas** - Comprehensive room customization
+- ✨ **Smart Defaults** - Intelligent fallback to global settings
+- 🚀 **Atomic Updates** - Partial configuration changes preserve other settings
+- 🔄 **Backward Compatible** - All existing configurations preserved
+- ⚡ **Efficient Storage** - Optimized JSON structure with validation
 
 ## Development
 
@@ -324,10 +372,6 @@ agenda_bot/
 │   └── Migration/
 │       ├── InstallBot.php       # Bot installation repair step
 │       └── Version1000Date...php # Database schema migration
-├── tests/                        # Unit tests for development
-│   ├── Unit/Service/            # Service layer tests
-│   ├── bootstrap.php            # Test bootstrap
-│   └── phpunit.xml              # PHPUnit configuration
 ├── l10n/                         # 🌍 Translation files
 │   ├── en.json                  # English translations (100+ strings)
 │   └── de.json                  # German translations (100+ strings)
@@ -416,15 +460,16 @@ The Agenda Bot uses the `OCA\AgendaBot` namespace and `ab_` database prefixes, e
 | **Guest** | ❌ | ❌ | ❌ | ✅ |
 | **Guest Moderator** | ✅ | ✅ | ✅ | ✅ |
 
-### Time Monitoring Features ⚡ Enhanced in v1.2.0
-- **Room-level configuration** - Each room can have custom time monitoring settings
-- **Global fallback** - Rooms without specific configuration use global defaults
-- **Configurable thresholds** - Set custom warning and overtime percentages per room
-- **Smart notifications** - Only alerts during active calls
-- **Duplicate prevention** - Each warning type sent only once per item
-- **Background processing** - Independent monitoring with room filtering via Nextcloud background jobs
-- **Call-aware** - Automatically detects active calls before sending alerts
-- **Moderator control** - Room moderators can configure monitoring without admin access
+### Time Monitoring Features ⚡ Enhanced in v1.4.0
+- **Unified Configuration** - Complete `config time` command suite for all time monitoring settings
+- **Flexible Thresholds** - Configurable warning (10-95%) and overtime (105-300%) percentages per room
+- **Room-specific Control** - Enable/disable monitoring per room without affecting other rooms
+- **Global Fallback** - Intelligent inheritance from global settings when room config not set
+- **Smart Notifications** - Call-aware alerts sent only during active meetings
+- **Duplicate Prevention** - Each warning type sent only once per item
+- **Background Processing** - Independent monitoring with room filtering via Nextcloud background jobs
+- **Moderator Control** - Room moderators can configure monitoring without admin intervention
+- **Backward Compatibility** - Legacy `time xxx` commands remain fully functional
 
 ### Meeting Analytics
 - **Completion rates** - Track % of agenda items completed
@@ -435,10 +480,16 @@ The Agenda Bot uses the `OCA\AgendaBot` namespace and `ab_` database prefixes, e
 
 ## 🌍 Multi-Language Features
 
-### Language Support
-- **English (en)** - Complete with 74+ translated strings
-- **German (de)** - Complete with 45+ translated strings
-- **Framework ready** for additional languages
+### Language Support ⚡ Enhanced in v1.4.0
+- **English (en)** - Complete with 200+ translated strings including all configuration areas
+- **German (de)** - Complete with 200+ translated strings including all configuration areas
+- **Framework ready** for additional languages with comprehensive translation infrastructure
+
+### v1.4.0 Localization Enhancements
+- **Configuration Commands** - All 5 configuration areas fully translated
+- **Help System Integration** - Contextual help and examples in user's language
+- **Error Messages** - Comprehensive error handling with localized feedback
+- **Visual Formatting** - Language-appropriate formatting and cultural adaptations
 
 ### Bot Registration
 - **Separate bot instances** per language (e.g., "Agenda bot (English)", "Agenda bot (Deutsch)")
@@ -446,15 +497,17 @@ The Agenda Bot uses the `OCA\AgendaBot` namespace and `ab_` database prefixes, e
 - **Language-specific URLs** for proper routing
 
 ### User Experience
-- **Automatic language detection** from user's Nextcloud settings
-- **Consistent localization** across all bot responses
-- **Fallback to English** for missing translations
-- **Help commands** display in user's preferred language
+- **Automatic language detection** from user's Nextcloud settings and room context
+- **Consistent localization** across all bot responses and configuration interfaces
+- **Fallback to English** for missing translations with graceful degradation
+- **Dynamic language switching** - Commands respond in appropriate language per room
+- **Help commands** display comprehensive examples in user's preferred language
 
 ### Developer Features
-- **Nextcloud l10n standards** - Uses official `IFactory` and `$l->t()` patterns
+- **Nextcloud l10n standards** - Uses official `IFactory` and `$l->t()` patterns throughout
 - **Easy language addition** - Add JSON file and update `Bot::SUPPORTED_LANGUAGES`
-- **Translation validation** - Structured JSON format with pluralization rules
+- **Translation validation** - Structured JSON format with proper pluralization rules
+- **Configuration translations** - All new v1.4.0 features include complete translation keys
 - **Comprehensive documentation** - See `MULTILINGUAL_SUPPORT.md` for implementation details
 
 ## Contributing
@@ -487,4 +540,4 @@ This project is licensed under the AGPL-3.0-or-later license.
 
 ---
 
-**Generated by Agenda bot v1.3.6** 📋
+**Generated by Agenda bot v1.4.0** 📋

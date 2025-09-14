@@ -24,6 +24,7 @@ class SummaryService {
 		protected AgendaService $agendaService,
 		protected IFactory $l10nFactory,
 		protected TimingUtilityService $timingUtilityService,
+		protected RoomConfigService $roomConfigService,
 	) {
 	}
 
@@ -54,6 +55,7 @@ class SummaryService {
 
 	public function generateAgendaSummary(string $token, string $conversation, string $lang = 'en'): ?array {
 		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		$emojis = $this->roomConfigService->getEmojisConfig($token);
 		$agendaData = $this->agendaService->exportAgenda($token);
 		
 		if ($agendaData['total'] === 0) {
@@ -74,10 +76,12 @@ class SummaryService {
 		// Enhanced completed section with timing percentages
 		if ($agendaData['completed'] > 0) {
 			$timingStats = $agendaData['timing_stats'];
-			$summary .= "**" . $l->t('Completed:') . "** " . $l->t('%d (%d%% 👍 / %d%% ⏰)', [
+			$summary .= "**" . $l->t('Completed:') . "** " . $l->t('%d (%d%% %s / %d%% %s)', [
 				$agendaData['completed'],
 				$timingStats['in_time_percentage'],
-				$timingStats['overdue_percentage']
+				$emojis['on_time'],
+				$timingStats['overdue_percentage'],
+				$emojis['time_warning']
 			]) . "\n";
 		} else {
 			$summary .= "**" . $l->t('Completed:') . "** " . $agendaData['completed'] . "\n";
@@ -86,7 +90,7 @@ class SummaryService {
 		$summary .= "**" . $l->t('Remaining:') . "** " . $agendaData['incomplete'] . "\n\n";
 
 		if (!empty($agendaData['completed_items_with_timing'])) {
-			$summary .= "#### ✅ " . $l->t('Completed Items') . "\n";
+			$summary .= "#### " . $emojis['completed'] . " " . $l->t('Completed Items') . "\n";
 			foreach ($agendaData['completed_items_with_timing'] as $item) {
 				$plannedDuration = $item['duration'];
 				$timeDiff = $item['time_diff'];
@@ -95,13 +99,13 @@ class SummaryService {
 				// Format timing display: planned+diff or planned-diff
 				if ($timeDiff > 0) {
 					$timingDisplay = $l->t('(%d+%d min)', [$plannedDuration, $timeDiff]);
-					$statusIcon = " " . $l->t('Time Warning');
+					$statusIcon = " " . $emojis['time_warning'];
 				} elseif ($timeDiff < 0) {
 					$timingDisplay = $l->t('(%d%d min)', [$plannedDuration, $timeDiff]); // negative diff
-					$statusIcon = " 👍";
+					$statusIcon = " " . $emojis['on_time'];
 				} else {
 					$timingDisplay = $l->t('(%d min)', [$plannedDuration]);
-					$statusIcon = " 👍";
+					$statusIcon = " " . $emojis['on_time'];
 				}
 				
 				$summary .= $item['position'] . ". " . $item['title'] . " " . $timingDisplay . $statusIcon . "\n";
@@ -110,7 +114,7 @@ class SummaryService {
 		}
 
 		if (!empty($agendaData['incomplete_items'])) {
-			$summary .= "#### " . $l->t('Pending') . " " . $l->t('Remaining Items') . "\n";
+			$summary .= "#### " . $emojis['pending'] . " " . $l->t('Remaining Items') . "\n";
 			foreach ($agendaData['incomplete_items'] as $item) {
 				$summary .= $item['position'] . ". " . $item['title'] . " (" . $item['duration'] . " " . $l->t('min') . ")\n";
 			}
