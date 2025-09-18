@@ -1049,6 +1049,7 @@ class AgendaService {
 					 "• `swap: 1,3` - " . $l->t('Swap agenda items %d and %d', [1, 3]) . " 🔒\n" .
 					 "• `remove: 2` / `delete: 2` - " . $l->t('Remove agenda item %d', [2]) . " 🔒\n" .
 					 "• `cleanup` / `agenda cleanup` - " . $l->t('Remove completed items') . " 🔒\n" .					 
+					 "• `agenda reset` - " . $l->t('Reset all items to incomplete') . " 🔒\n" .
 					 "• `agenda clear` - " . $l->t('Clear all agenda items') . " 🔒\n\n" .
 					 "*" . $l->t('🔒 Require moderator/owner access') . "*";
 		} else {
@@ -1316,6 +1317,49 @@ class AgendaService {
 		} else {
 			return '🧹 ' . $l->t('Removed %d completed items - agenda is now empty', [$completedCount]);
 		}
+	}
+
+	/**
+	 * Reset all agenda items to incomplete status (requires moderator permissions)
+	 */
+	public function resetAllItems(string $token, ?array $actorData = null, string $lang = 'en'): ?string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
+		// Check moderator permissions if actor data is provided
+		if ($actorData !== null && !$this->permissionService->isActorModerator($token, $actorData)) {
+			return $this->permissionService->getPermissionDeniedMessage($l->t('reset all agenda items'), $lang);
+		}
+		
+		$items = $this->logEntryMapper->findAgendaItems($token);
+		
+		if (empty($items)) {
+			return '❌ ' . $l->t('No agenda items to reset');
+		}
+		
+		$resetCount = 0;
+		
+		// Reset all agenda items to incomplete status
+		foreach ($items as $item) {
+			if ($item->getIsCompleted()) {
+				$resetCount++;
+			}
+			
+			// Reset completion status and timestamps
+			$item->setIsCompleted(false);
+			$item->setCompletedAt(null);
+			
+			// Reset time warnings to re-enable monitoring
+			$item->setWarningSent(false);
+			
+			$this->logEntryMapper->update($item);
+		}
+		
+		if ($resetCount === 0) {
+			// All items were already incomplete
+			return 'ℹ️ ' . $l->t('All agenda items are already incomplete');
+		}
+		
+		return '🔄 ' . $l->t('Reset %d agenda items to incomplete', [$resetCount]);
 	}
 
 	/**
