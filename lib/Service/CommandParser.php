@@ -55,6 +55,7 @@ class CommandParser {
 	public const CONFIG_EMOJIS_SET_PATTERN = '/^config\s+emojis\s+(current-item|completed|pending|on-time|time-warning)\s+(.+)$/i';
 	public const CONFIG_EMOJIS_RESET_PATTERN = '/^config\s+emojis\s+reset$/i';
 	public const CLEANUP_PATTERN = '/^(agenda\s+)?(cleanup|clean)$/i';
+	public const RESET_PATTERN = '/^agenda\s+reset$/i';
 
 	/**
 	 * Parse command from message
@@ -382,6 +383,14 @@ class CommandParser {
 				'command' => 'cleanup',
 				'token' => $token,
 				'action' => strtolower($matches[2])
+			];
+		}
+
+		// Reset command
+		if (preg_match(self::RESET_PATTERN, $message)) {
+			return [
+				'command' => 'reset',
+				'token' => $token
 			];
 		}
 

@@ -483,6 +483,9 @@ class BotInvokeListener implements IEventListener {
 			case 'cleanup':
 				return $this->agendaService->removeCompletedItems($command['token'], $actorData ?: null, $lang);
 
+			case 'reset':
+				return $this->agendaService->resetAllItems($command['token'], $actorData ?: null, $lang);
+
 			// Unified config commands
 			case 'config_show':
 				return $this->handleConfigShow($command['token'], $actorData ?: null, $lang);

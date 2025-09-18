@@ -2,6 +2,60 @@
 
 All notable changes to the Agenda Bot project will be documented in this file.
 
+## [1.4.1] - 2025-09-18
+
+### ✨ Added - Agenda Reset Command
+
+#### 🔄 **New `agenda reset` Command**
+- **Bulk status reset**: Reset all agenda items to incomplete status with a single command
+- **Efficient workflow**: Eliminates need for individual `undone: X` commands for each item
+- **Perfect for recurring meetings**: Weekly stand-ups, monthly reviews, and template meetings
+- **Time tracking reset**: Automatically resets time monitoring warnings for all items
+- **Permission controlled**: Requires moderator/owner permissions for data integrity
+- **Smart handling**: Graceful responses for edge cases (no items, already incomplete items)
+
+#### 🚀 **Use Cases**
+- **Weekly team meetings**: Quickly reset last week's completed agenda for reuse
+- **Monthly reviews**: Reset quarterly agenda items for the next cycle
+- **Template meetings**: Efficiently reuse standardized agenda formats
+- **Recurring check-ins**: Streamlined workflow for regular meeting patterns
+
+#### 💻 **Technical Implementation**
+- **CommandParser**: New `RESET_PATTERN` for command recognition
+- **AgendaService**: `resetAllItems()` method with comprehensive error handling
+- **BotInvokeListener**: Integrated reset command handler
+- **Complete localization**: Full English and German translation support
+- **Help integration**: Command documented in moderator help text
+
+#### 🌍 **Localization**
+- **English**: Complete translation keys for all reset functionality
+- **German**: Full German localization with proper pluralization
+- **Error handling**: Localized messages for all edge cases
+- **Help text**: Reset command included in contextual help system
+
+#### 📊 **Command Examples**
+```bash
+agenda reset                    # Reset all agenda items to incomplete
+agenda status                   # Verify the reset worked
+
+# Before reset:
+# ✅ 1. Project review (completed)
+# ✅ 2. Budget discussion (completed)
+# ✅ 3. Next steps (completed)
+
+# After reset:
+# 📍 1. Project review (15 min)
+# 📍 2. Budget discussion (20 min) 
+# 📍 3. Next steps (10 min)
+```
+
+#### 🎯 **Benefits**
+- ✅ **One command replaces many**: `agenda reset` vs. multiple `undone: 1`, `undone: 2`, etc.
+- ✅ **Time efficient**: Instant bulk operation for recurring meetings
+- ✅ **Preserves structure**: Maintains item order, titles, and durations
+- ✅ **Enables reuse**: Perfect for template-based recurring meetings
+- ✅ **Smart cleanup**: Automatically resets time monitoring states
+
 ## [1.4.0] - 2025-09-14
 
 ### 🚀 Added - Room-Level Bot Configuration
