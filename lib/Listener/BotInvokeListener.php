@@ -44,7 +44,7 @@ class BotInvokeListener implements IEventListener {
 		protected IConfig $config,
 		protected LoggerInterface $logger,
 		protected IFactory $l10nFactory,
-		protected RoomConfigService $roomConfigService,
+	   protected RoomConfigService $roomConfigService,
 		protected ChatManager $chatManager,
 		protected Manager $roomManager,
 	) {
@@ -84,9 +84,11 @@ class BotInvokeListener implements IEventListener {
 			return;
 		}
 		
-		if ($data['type'] === 'Join') {
+	if ($data['type'] === 'Join') {
 			// Bot has been activated/enabled in the room - show welcome message
 			$token = $data['object']['id'];
+			
+			
 			$welcome = $this->getBotWelcomeMessage($lang, $token, $data['actor'] ?? []);
 			
 			// Send welcome message directly using ChatManager since BotService doesn't process answers for Join events
@@ -139,6 +141,8 @@ class BotInvokeListener implements IEventListener {
 			// Welcome message when bot is activated in conversation
 			if ($data['object']['name'] === 'bot_enabled' ||
 				$data['object']['name'] === 'bot_installed') {
+				
+				
 				$welcome = $this->getBotWelcomeMessage($lang, $token, $data['actor'] ?? []);
 				
 				// Send welcome message directly using ChatManager
@@ -325,6 +329,7 @@ class BotInvokeListener implements IEventListener {
 			]);
 		}
 	}
+	
 	
 	/**
 	 * Get bot welcome message with help
