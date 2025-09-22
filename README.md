@@ -2,7 +2,7 @@
 
 🤖 **A specialized bot for intelligent meeting agenda management and real-time time tracking during Nextcloud Talk calls.**
 
-🔄 **NEW in v1.5.0 introduces Migration Framework** - Robust system for managing version upgrades and database schema changes.
+🌍 **NEW in v1.5.0 German Formality Language Variants with Migration Framework** with informal (Du) and formal (Sie) variants plus robust migration framework for seamless transitions
 
 🎆 **v1.4.0 introduced Complete Room-Level Bot Configuration!** Transform each Talk room into a perfectly customized meeting assistant with 5 comprehensive configuration areas.
 
