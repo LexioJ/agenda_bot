@@ -35,12 +35,18 @@ Tired of unproductive meetings that run overtime? The Agenda Bot transforms chao
 - Automatic progression through agenda items
 - Live updates for all participants
 
-#### ⚙️ Room-Level Bot Configuration (NEW in v1.4.0!)
+#### ⚙️ Room-Level Bot Configuration
 - **Time Monitoring**: Custom warning thresholds and overtime alerts per room
 - **Auto-behaviors**: Control automatic start, cleanup, and summary generation
 - **Response-behaviors**: Choose between full responses or minimal emoji-only mode
 - **Agenda Limits**: Configure max agenda items, max bulk additions, and default durations
 - **Custom Emojis**: Personalize agenda item status indicators
+
+#### 🌍 Multi-Language Support (NEW in v1.5.0!)
+- **German Language Variants**: Support for both informal (Du) and formal (Sie) German communication
+- **Automatic Migration**: Seamless upgrade handling with intelligent migration framework
+- **Professional Settings**: Perfect for corporate environments requiring formal language
+- **User Choice**: Select the communication style that fits your team culture
 
 #### 🔐 Smart Permission System
 - Role-based access: Owners, Moderators, Users, Guests
@@ -70,7 +76,7 @@ Tired of unproductive meetings that run overtime? The Agenda Bot transforms chao
 
 #### Start having better meetings - Add the Agenda Bot to your Talk rooms and experience the difference!]]></description>
 
-	<version>1.4.1</version>
+	<version>1.5.0</version>
 	<licence>agpl</licence>
 
 	<author>Agenda Bot Team</author>
@@ -98,7 +104,9 @@ Tired of unproductive meetings that run overtime? The Agenda Bot transforms chao
 
 	<background-jobs>
 		<job>OCA\AgendaBot\BackgroundJob\AgendaTimeMonitorJob</job>
+		<job>OCA\AgendaBot\BackgroundJob\AgendaMigrationJob</job>
 	</background-jobs>
+
 
 	<repair-steps>
 		<install>

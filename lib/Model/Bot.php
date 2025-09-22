@@ -11,7 +11,8 @@ namespace OCA\AgendaBot\Model;
 
 class Bot {
 	public const SUPPORTED_LANGUAGES = [
-		'en',
-		'de',
+		'en',        // English
+		'de',        // German informal "Du" (NEW - following Nextcloud standard)
+		'de_DE',     // German formal "Sie" (NEW - explicit formal variant)
 	];
 }

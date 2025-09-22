@@ -38,6 +38,8 @@ class BotService {
 		} else {
 			$secret = $this->random->generate(64, ISecureRandom::CHAR_HUMAN_READABLE);
 		}
+		
+		// Install all supported languages (including new ones after migration)
 		foreach (Bot::SUPPORTED_LANGUAGES as $lang) {
 			$this->installLanguage($secret, $lang);
 		}
@@ -50,10 +52,11 @@ class BotService {
 	}
 
 	protected function installLanguage(string $secret, string $lang): void {
-		// Define language names explicitly
+		// Define language names with formal/informal variants
 		$languageNames = [
 			'en' => 'English',
-			'de' => 'Deutsch',
+			'de' => 'Deutsch: Du',     // Informal German
+			'de_DE' => 'Deutsch: Sie', // Formal German
 		];
 		
 		$langName = $languageNames[$lang] ?? $lang;
@@ -100,4 +103,5 @@ class BotService {
 		} catch (\Throwable) {
 		}
 	}
+	
 }

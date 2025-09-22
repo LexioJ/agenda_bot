@@ -2,6 +2,35 @@
 
 All notable changes to the Agenda Bot project will be documented in this file.
 
+## [1.5.0] - 2025-09-22
+
+### 🔄 Added - Migration Framework & German Formality Support
+
+#### 🚀 **Migration Framework (NEW)**
+- **Automatic Version Detection**: Seamlessly detects app version changes and triggers migrations
+- **Background Job Processing**: Non-blocking migration execution via Nextcloud's background job system
+- **Version-Aware Logic**: Detects upgrades by comparing current version (≥ 1.5.0) with last enabled version (< 1.5.0)
+- **Safe Operation**: Database transactions with rollback capabilities on migration failures
+- **Extensible Architecture**: Framework ready for future schema changes and feature migrations
+- **Admin Monitoring**: Complete observability of migration status through logs and job listings
+- **Migration Tasks System**: Modular migration tasks implementing `IMigrationTask` interface
+
+#### 🌍 **German Formality Migration (GitHub Issue #16)**
+- **Formal German Language Support**: Introduces new formal German bot variant (`de_DE`) alongside existing informal variant (`de`)
+- **Room Assignment Migration**: Migrates rooms from old formal bot (`nextcloudapp://agenda_bot/de`) to new formal bot (`nextcloudapp://agenda_bot/de_DE`)
+- **Language Separation**: `de` = Informal German ("Du"), `de_DE` = Formal German ("Sie")
+- **Cultural Appropriateness**: Dedicated formal German language variant suitable for business environments
+- **Automatic Migration**: Room assignments automatically updated on version upgrade to preserve formal language experience
+- **Zero User Disruption**: Migration happens transparently in the background via background jobs
+- **Comprehensive Testing**: Verified migration compatibility across all supported versions (v1.3.4-v1.4.1)
+
+#### 📚 **Documentation**
+- **Migration Framework Guide**: Complete documentation in `docs/MIGRATION_FRAMEWORK.md`
+- **Architecture Overview**: Detailed explanation of migration system components
+- **Developer Guide**: Instructions for creating new migration tasks
+- **Troubleshooting**: Common issues and admin commands for migration monitoring
+- **Best Practices**: Guidelines for safe and effective migrations
+
 ## [1.4.1] - 2025-09-18
 
 ### ✨ Added - Agenda Reset Command
