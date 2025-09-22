@@ -90,7 +90,7 @@ class MigrationService {
                 $this->jobList->add(\OCA\AgendaBot\BackgroundJob\AgendaMigrationJob::class);
                 $this->logger->info('Migration job scheduled for version upgrade', [
                     'current_version' => $this->config->getAppValue(self::APP_NAME, 'installed_version', '1.0.0'),
-                    'target_version' => self::TARGET_VERSION
+                    'target_version' => $this->getCurrentVersion()
                 ]);
             }
         }
