@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OCA\AgendaBot\Migration;
 
 use OCA\AgendaBot\Service\BotService;
+use OCA\AgendaBot\Migration\MigrationService;
 use OCA\Talk\Events\BotInstallEvent;
 use OCP\IURLGenerator;
 use OCP\Migration\IOutput;
@@ -19,6 +20,7 @@ class InstallBot implements IRepairStep {
 	public function __construct(
 		protected IURLGenerator $url,
 		protected BotService $service,
+		protected MigrationService $migrationService,
 	) {
 	}
 
@@ -32,7 +34,11 @@ class InstallBot implements IRepairStep {
 			return;
 		}
 
+		// Install/update bot
 		$backend = $this->url->getAbsoluteURL('');
 		$this->service->installBot($backend);
+		
+		// Schedule migrations if needed and update version tracking
+		$this->migrationService->scheduleIfNeeded();
 	}
 }

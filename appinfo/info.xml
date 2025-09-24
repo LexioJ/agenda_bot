@@ -104,7 +104,6 @@ Tired of unproductive meetings that run overtime? The Agenda Bot transforms chao
 
 	<background-jobs>
 		<job>OCA\AgendaBot\BackgroundJob\AgendaTimeMonitorJob</job>
-		<job>OCA\AgendaBot\BackgroundJob\AgendaMigrationJob</job>
 	</background-jobs>
 
 

@@ -23,12 +23,9 @@ class MigrationService {
     
     private const APP_NAME = 'agenda_bot';
     
-    // Define all migration milestones in chronological order
+    // Migration version milestones in chronological order
     private const MIGRATION_VERSIONS = [
-        '1.5.0', // German Formality Migration introduced
-        // Future versions would be added here:
-        // '1.6.0', // Some new feature migration
-        // '1.7.0', // Another feature migration
+        '1.5.0', // German Formality Migration
     ];
     
     public function __construct(
@@ -46,8 +43,13 @@ class MigrationService {
         $currentVersion = $this->getCurrentVersion();
         $lastEnabledVersion = $this->config->getAppValue(self::APP_NAME, 'last_enabled_version', null);
         
-        // Fresh install: lastEnabledVersion is null or equals currentVersion - no migration needed
-        if ($lastEnabledVersion === null || version_compare($lastEnabledVersion, $currentVersion, '>=')) {
+        // Backward compatibility: if last_enabled_version is not set, assume 1.0.0 (pre-migration era)
+        if ($lastEnabledVersion === null) {
+            $lastEnabledVersion = '1.0.0';
+        }
+        
+        // No migration needed if last enabled version is same or newer than current version
+        if (version_compare($lastEnabledVersion, $currentVersion, '>=')) {
             return false;
         }
         
@@ -57,8 +59,7 @@ class MigrationService {
         $this->logger->debug('Migration version check', [
             'current_version' => $currentVersion,
             'last_enabled_version' => $lastEnabledVersion,
-            'has_required_migrations' => $hasRequiredMigrations,
-            'migration_versions' => self::MIGRATION_VERSIONS
+            'has_required_migrations' => $hasRequiredMigrations
         ]);
         
         return $hasRequiredMigrations;
@@ -81,18 +82,25 @@ class MigrationService {
     }
 
     /**
-     * Schedule migration job if needed
+     * Legacy method - migration scheduling now handled by AppEnableListener
      */
     public function scheduleIfNeeded(): void {
-        if ($this->shouldRunMigration()) {
-            // Check if migration job is already scheduled
-            if (!$this->jobList->has(\OCA\AgendaBot\BackgroundJob\AgendaMigrationJob::class, null)) {
-                $this->jobList->add(\OCA\AgendaBot\BackgroundJob\AgendaMigrationJob::class);
-                $this->logger->info('Migration job scheduled for version upgrade', [
-                    'current_version' => $this->config->getAppValue(self::APP_NAME, 'installed_version', '1.0.0'),
-                    'target_version' => $this->getCurrentVersion()
-                ]);
-            }
+        // No-op: Migration scheduling moved to AppEnableListener for accurate version comparison
+    }
+    
+    /**
+     * Schedule migration background job
+     */
+    public function scheduleMigrationJob(): void {
+        // Check if migration job is already scheduled
+        if (!$this->jobList->has(\OCA\AgendaBot\BackgroundJob\AgendaMigrationJob::class, null)) {
+            $this->jobList->add(\OCA\AgendaBot\BackgroundJob\AgendaMigrationJob::class);
+            $this->logger->info('Migration job scheduled for version upgrade', [
+                'current_version' => $this->getCurrentVersion(),
+                'last_enabled_version' => $this->config->getAppValue(self::APP_NAME, 'last_enabled_version', null)
+            ]);
+        } else {
+            $this->logger->debug('Migration job already scheduled');
         }
     }
 
@@ -103,6 +111,8 @@ class MigrationService {
         $this->logger->info('Starting migration execution');
         
         if (!$this->shouldRunMigration()) {
+            // No migrations needed, but still update last_enabled_version for tracking
+            $this->updateLastEnabledVersion();
             return [
                 'success' => true,
                 'message' => 'No migrations needed',
@@ -110,7 +120,13 @@ class MigrationService {
             ];
         }
         
-        $lastEnabledVersion = $this->config->getAppValue(self::APP_NAME, 'last_enabled_version', '1.0.0');
+        $lastEnabledVersion = $this->config->getAppValue(self::APP_NAME, 'last_enabled_version', null);
+        
+        // Backward compatibility: if last_enabled_version is not set, assume 1.0.0 (pre-migration era)
+        if ($lastEnabledVersion === null) {
+            $lastEnabledVersion = '1.0.0';
+        }
+        
         $currentVersion = $this->getCurrentVersion();
         
         // Get only the tasks needed for this specific version range
@@ -152,8 +168,8 @@ class MigrationService {
         $success = empty($failed);
         
         if ($success) {
-            // Update last_enabled_version to current version after successful migration
-            $this->config->setAppValue(self::APP_NAME, 'last_enabled_version', $currentVersion);
+            // Update last_enabled_version after successful migration
+            $this->updateLastEnabledVersion();
             $this->logger->info('Migration completed successfully', [
                 'executed_tasks' => $executed,
                 'skipped_tasks' => count($this->getAllAvailableTasks()) - count($tasks),
@@ -173,13 +189,11 @@ class MigrationService {
     }
 
     /**
-     * Get all available migration tasks (for reference)
+     * Get all available migration tasks
      */
     private function getAllAvailableTasks(): array {
         return [
             new GermanFormalityMigrationTask($this->db, $this->logger),
-            // Future tasks would be added here:
-            // new SomeNewMigrationTask($this->db, $this->logger),
         ];
     }
     
@@ -254,12 +268,19 @@ class MigrationService {
      * Get the current version from oc_appconfig (set by Nextcloud from info.xml)
      */
     public function getCurrentVersion(): string {
-        return $this->config->getAppValue(self::APP_NAME, 'installed_version', '1.5.0');
+        return $this->config->getAppValue(self::APP_NAME, 'installed_version', '1.0.0');
+    }
+    
+    /**
+     * Update last_enabled_version to current version
+     */
+    public function updateLastEnabledVersion(): void {
+        $currentVersion = $this->getCurrentVersion();
+        $this->config->setAppValue(self::APP_NAME, 'last_enabled_version', $currentVersion);
     }
     
     /**
      * Clean up migration jobs (administrative method)
-     * Removes any scheduled migration jobs if no migrations are needed
      */
     public function cleanupMigrationJobs(): bool {
         try {
