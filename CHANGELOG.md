@@ -2,6 +2,14 @@
 
 All notable changes to the Agenda Bot project will be documented in this file.
 
+## [1.5.1] - 2025-09-24
+
+### 🐛 Fixed - Agenda Reset Bug
+
+- Fixed `agenda reset` not properly clearing active time tracking timestamps
+- Items no longer continue showing elapsed time after reset command
+- Enhanced reset messages with improved localization (EN/DE)
+
 ## [1.5.0] - 2025-09-22
 
 ### 🔄 Added - Migration Framework & German Formality Support
