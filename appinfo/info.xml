@@ -76,7 +76,7 @@ Tired of unproductive meetings that run overtime? The Agenda Bot transforms chao
 
 #### Start having better meetings - Add the Agenda Bot to your Talk rooms and experience the difference!]]></description>
 
-	<version>1.5.0</version>
+	<version>1.5.1</version>
 	<licence>agpl</licence>
 
 	<author>Agenda Bot Team</author>
@@ -104,7 +104,6 @@ Tired of unproductive meetings that run overtime? The Agenda Bot transforms chao
 
 	<background-jobs>
 		<job>OCA\AgendaBot\BackgroundJob\AgendaTimeMonitorJob</job>
-		<job>OCA\AgendaBot\BackgroundJob\AgendaMigrationJob</job>
 	</background-jobs>
 
 

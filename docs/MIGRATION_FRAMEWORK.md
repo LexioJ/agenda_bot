@@ -11,23 +11,29 @@ The Agenda Bot Migration Framework is a robust system for managing database sche
 
 ### Core Components
 
-The framework consists of three main components:
+The framework consists of four main components:
 
-#### 1. AgendaMigrationJob (`lib/BackgroundJob/AgendaMigrationJob.php`)
+#### 1. AppEnableListener (`lib/Listener/AppEnableListener.php`)
+- **Purpose**: Detects app enable events and triggers migration scheduling
+- **Timing**: Runs after app installation/upgrade when version information is accurate
+- **Features**: Version comparison, migration decision logic, version tracking
+- **Integration**: Uses Nextcloud's AppEnableEvent system
+
+#### 2. AgendaMigrationJob (`lib/BackgroundJob/AgendaMigrationJob.php`)
 - **Purpose**: Executes migration tasks as background jobs
-- **Scheduling**: Automatically triggered on app enable/version changes
+- **Scheduling**: Triggered by AppEnableListener when migrations are needed
 - **Execution**: Runs migrations based on version comparison logic
 - **Error Handling**: Includes comprehensive logging and error recovery
 
-#### 2. MigrationService (`lib/Service/MigrationService.php`)
+#### 3. MigrationService (`lib/Migration/MigrationService.php`)
 - **Purpose**: Coordinates migration operations and version management
 - **Features**: 
   - Version tracking and comparison
   - Migration task registration
-  - Database transaction management
+  - Background job scheduling
   - Progress reporting
 
-#### 3. Migration Tasks (`lib/Migration/Tasks/`)
+#### 4. Migration Tasks (`lib/Migration/Tasks/`)
 - **Purpose**: Individual migration operations
 - **Structure**: Implements `IMigrationTask` interface
 - **Examples**: Schema updates, data transformations, settings migrations
@@ -35,8 +41,9 @@ The framework consists of three main components:
 ## Key Features
 
 ### 🚀 Automatic Scheduling
-- Detects app version changes automatically
-- Schedules migrations as background jobs
+- Detects app version changes via AppEnableEvent
+- Runs after accurate version information is available
+- Schedules migrations as background jobs only when needed
 - Prevents duplicate executions
 - Handles fresh installs vs. upgrades
 
@@ -59,6 +66,23 @@ The framework consists of three main components:
 - State validation
 
 ## Implementation Details
+
+### Architecture: Event-Driven Migration Scheduling
+
+The migration framework uses Nextcloud's app lifecycle events to ensure accurate version comparison:
+
+**Problem Solved**: During app installation/upgrade, repair steps run before Nextcloud updates the `installed_version` in the database. This caused migration logic to see outdated version information.
+
+**Solution**: AppEnableListener runs after the app enable process completes, when `installed_version` reflects the actual new version from `info.xml`.
+
+```
+App Installation Flow:
+1. App files deployed
+2. Repair steps run (InstallBot) - installed_version still old
+3. Nextcloud updates installed_version from info.xml
+4. AppEnableEvent fired → AppEnableListener runs
+5. Accurate version comparison → correct migration decision
+```
 
 ### Version Detection Logic
 
@@ -84,20 +108,31 @@ interface IMigrationTask {
 
 ### Automatic Scheduling
 
-The framework automatically schedules migrations when:
-- App is running target version (≥ 1.5.0) but last_enabled_version < 1.5.0 (upgrade detected)
-- Manual migration triggers (admin only)
+The framework automatically schedules migrations through the AppEnableListener:
+- Triggered when app is enabled (fresh install or upgrade)
+- Runs after Nextcloud updates installed_version (accurate version comparison)
+- Compares last_enabled_version vs current installed_version
+- Schedules background job only when migrations are needed
 
 ```php
-public function scheduleIfNeeded(): void {
-    if ($this->shouldRunMigration()) {
-        $this->jobList->add(AgendaMigrationJob::class);
-        $this->logger->info('Migration scheduled for version upgrade');
+// AppEnableListener.php
+public function handle(Event $event): void {
+    if ($event->getAppId() !== Application::APP_ID) {
+        return;
+    }
+    
+    // Now we have accurate version information
+    if ($this->migrationService->shouldRunMigration()) {
+        $this->migrationService->scheduleMigrationJob();
+        // Version tracking updated after migration completes
+    } else {
+        // No migration needed - update version tracking immediately
+        $this->migrationService->updateLastEnabledVersion();
     }
 }
 
 // Migration logic:
-// - current_version >= 1.5.0 (running target version)
+// - installed_version >= 1.5.0 (running target version) 
 // - last_enabled_version < 1.5.0 (was running older version)
 // = Upgrade detected, migration needed
 ```

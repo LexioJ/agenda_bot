@@ -1348,6 +1348,9 @@ class AgendaService {
 			$item->setIsCompleted(false);
 			$item->setCompletedAt(null);
 			
+			// Reset start time to stop time tracking (critical fix)
+			$item->setStartTime(null);
+			
 			// Reset time warnings to re-enable monitoring
 			$item->setWarningSent(false);
 			
@@ -1355,11 +1358,11 @@ class AgendaService {
 		}
 		
 		if ($resetCount === 0) {
-			// All items were already incomplete
-			return 'ℹ️ ' . $l->t('All agenda items are already incomplete');
+			// All items were already incomplete, but we still reset timestamps
+			return 'ℹ️ ' . $l->t('All agenda items were already incomplete') . ' — ' . $l->t('Reset timestamps and cleared current item status');
 		}
 		
-		return '🔄 ' . $l->t('Reset %d agenda items to incomplete', [$resetCount]);
+		return '🔄 ' . $l->t('Reset %d agenda items to incomplete and cleared all timestamps', [$resetCount]);
 	}
 
 	/**
