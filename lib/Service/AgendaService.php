@@ -512,8 +512,10 @@ class AgendaService {
 		$item->setStartTime($this->timeFactory->now()->getTimestamp());
 		$this->logEntryMapper->update($item);
 
-	$plannedDisplay = $this->timingUtilityService->formatDurationDisplay($item->getDurationMinutes(), $lang);
-	return '🗣️ ' . $l->t('Set agenda item %d as current:', [$position]) . "\n`" . $item->getDetails() . "`\n*" . $l->t('Planned duration: %s', [$plannedDisplay]) . "*";
+		// Get custom emoji configuration
+		$emojis = $this->roomConfigService->getEmojisConfig($token);
+		$plannedDisplay = $this->timingUtilityService->formatDurationDisplay($item->getDurationMinutes(), $lang);
+		return $emojis['current_item'] . ' ' . $l->t('Set agenda item %d as current:', [$position]) . "\n`" . $item->getDetails() . "`\n*" . $l->t('Planned duration: %s', [$plannedDisplay]) . "*";
 	}
 
 	/**
@@ -626,6 +628,9 @@ class AgendaService {
 		$itemToComplete->setCompletedAt($this->timeFactory->now()->getTimestamp());
 		$this->logEntryMapper->update($itemToComplete);
 		
+		// Get custom emoji configuration
+		$emojis = $this->roomConfigService->getEmojisConfig($token);
+		
 		// Build response based on whether this was the current item
 		if ($isCurrentItem) {
 			// Calculate timing details for current item completion
@@ -634,7 +639,7 @@ class AgendaService {
 			$actualDisplay = $this->timingUtilityService->formatDurationDisplay($actualTime, $lang);
 			$plannedDisplay = $this->timingUtilityService->formatDurationDisplay($plannedTime, $lang);
 			
-			$response = "✅ " . $l->t('Completed agenda item %d: **"%s"** (%s/%s)', [
+			$response = $emojis['completed'] . ' ' . $l->t('Completed agenda item %d: **"%s"** (%s/%s)', [
 				$itemToComplete->getOrderPosition(), 
 				$itemToComplete->getDetails(), 
 				$actualDisplay, 
@@ -645,7 +650,7 @@ class AgendaService {
 			$nextItem = $this->moveToNextIncompleteItem($token);
 			if ($nextItem) {
 				$nextPlannedDisplay = $this->timingUtilityService->formatDurationDisplay($nextItem->getDurationMinutes(), $lang);
-				$response .= "\n🗣️ " . $l->t('Moving to next item %d:', [$nextItem->getOrderPosition()]);
+				$response .= "\n" . $emojis['current_item'] . ' ' . $l->t('Moving to next item %d:', [$nextItem->getOrderPosition()]);
 				$response .= "\n`" . $nextItem->getDetails() . "`";
 				$response .= "\n*" . $l->t('Planned duration: %s', [$nextPlannedDisplay]) . "*";
 			} else {
@@ -653,7 +658,7 @@ class AgendaService {
 			}
 		} else {
 			// Just a regular item completion, not the current one
-			$response = '✅ ' . $l->t('Marked agenda item %d as completed: "%s"', [$itemToComplete->getOrderPosition(), $itemToComplete->getDetails()]);
+			$response = $emojis['completed'] . ' ' . $l->t('Marked agenda item %d as completed: "%s"', [$itemToComplete->getOrderPosition(), $itemToComplete->getDetails()]);
 		}
 		
 		return $response;
@@ -1426,5 +1431,77 @@ class AgendaService {
 				'overdue_percentage' => count($completed) > 0 ? round(($overdueCount / count($completed)) * 100) : 0,
 			],
 		];
+	}
+
+	/**
+	 * Export room configuration as bulk configuration commands
+	 */
+	public function exportConfiguration(string $token, string $lang = 'en'): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		$configCommands = [];
+		
+		// Export time monitoring configuration
+		$timeConfig = $this->roomConfigService->getTimeMonitoringConfig($token);
+		if ($timeConfig['source'] === 'room') {
+			if (!$timeConfig['enabled']) {
+				$configCommands[] = 'config time disable';
+			} else {
+				$configCommands[] = 'config time enable';
+				// Convert thresholds to percentages
+				$warningPercent = (int)($timeConfig['warning_threshold'] * 100);
+				$overtimePercent = (int)($timeConfig['overtime_threshold'] * 100);
+				$configCommands[] = "config time thresholds {$warningPercent} {$overtimePercent}";
+			}
+		}
+		
+		// Export response configuration
+		$responseConfig = $this->roomConfigService->getResponseConfig($token);
+		if ($responseConfig['source'] === 'room') {
+			$configCommands[] = "config response {$responseConfig['response_mode']}";
+		}
+		
+		// Export limits configuration
+		$limitsConfig = $this->roomConfigService->getAgendaLimitsConfig($token);
+		if ($limitsConfig['source'] === 'room') {
+			$configCommands[] = "config limits max-items {$limitsConfig['max_items']}";
+			$configCommands[] = "config limits max-bulk {$limitsConfig['max_bulk_items']}";
+			$configCommands[] = "config limits default-duration {$limitsConfig['default_duration']}";
+		}
+		
+		// Export auto behaviors configuration
+		$autoConfig = $this->roomConfigService->getAutoBehaviorsConfig($token);
+		if ($autoConfig['source'] === 'room') {
+			$startAgenda = $autoConfig['start_agenda'] ? 'enable' : 'disable';
+			$cleanup = $autoConfig['cleanup'] ? 'enable' : 'disable';
+			$summary = $autoConfig['summary'] ? 'enable' : 'disable';
+			$configCommands[] = "config auto start-agenda {$startAgenda}";
+			$configCommands[] = "config auto cleanup {$cleanup}";
+			$configCommands[] = "config auto summary {$summary}";
+		}
+		
+		// Export emojis configuration
+		$emojisConfig = $this->roomConfigService->getEmojisConfig($token);
+		if ($emojisConfig['source'] === 'room') {
+			$configCommands[] = "config emojis current-item {$emojisConfig['current_item']}";
+			$configCommands[] = "config emojis completed {$emojisConfig['completed']}";
+			$configCommands[] = "config emojis pending {$emojisConfig['pending']}";
+			$configCommands[] = "config emojis on-time {$emojisConfig['on_time']}";
+			$configCommands[] = "config emojis time-warning {$emojisConfig['time_warning']}";
+		}
+		
+		// Build the response
+		if (empty($configCommands)) {
+			return '📋 **' . $l->t('Configuration Export') . "**\n\n" .
+				'ℹ️ ' . $l->t('No room-specific configuration found. Using global defaults.') . "\n\n" .
+				'💡 ' . $l->t('Use config commands to customize this room, then export again.');
+		}
+		
+		$commandCount = count(array_filter($configCommands, fn($cmd) => !str_starts_with($cmd, '#')));
+		$output = '📋 **' . $l->t('Configuration Export') . "** ({$commandCount} " . $l->t('commands') . ")\n\n";
+		$output .= '💡 ' . $l->t('Copy these commands to apply this configuration to another room:') . "\n\n";
+		$output .= "```\n" . implode("\n", $configCommands) . "\n```\n\n";
+		$output .= '💡 ' . $l->t('Note: You can delete this message if desired.');
+		
+		return $output;
 	}
 }

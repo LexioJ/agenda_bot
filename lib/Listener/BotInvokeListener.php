@@ -106,8 +106,17 @@ class BotInvokeListener implements IEventListener {
 			if ($command) {
 				$response = $this->handleCommand($command, $data['actor'] ?? [], $lang);
 				if ($response) {
-					$event->addAnswer($response, true);
-					return;
+					// Check response mode and convert to emoji reaction if minimal mode
+					$reactionEmoji = $this->getEmojiReactionForCommand($command, $token);
+					
+					if ($reactionEmoji) {
+						// Use emoji reaction instead of text response
+						$this->sendEmojiReaction($event, $reactionEmoji);
+					} else {
+						// Use normal text response
+						$event->addAnswer($response, true);
+					}
+				return;
 				}
 			}
 
@@ -116,7 +125,14 @@ class BotInvokeListener implements IEventListener {
 			$bulkAgendaData = $this->agendaService->parseBulkAgendaItems($message, $token);
 			if ($bulkAgendaData) {
 				$result = $this->agendaService->addBulkAgendaItems($token, $bulkAgendaData, $data['actor'] ?? null, $lang);
-				$event->addAnswer($result['message'], true);
+				
+				// Check if we should use emoji reaction for bulk agenda in minimal mode
+				$reactionEmoji = $this->getEmojiReactionForBulkAgenda($token, $result);
+				if ($reactionEmoji) {
+					$this->sendEmojiReaction($event, $reactionEmoji);
+				} else {
+					$event->addAnswer($result['message'], true);
+				}
 				return;
 			}
 			
@@ -124,8 +140,11 @@ class BotInvokeListener implements IEventListener {
 			$agendaData = $this->agendaService->parseAgendaItem($message, $token);
 			if ($agendaData) {
 				$result = $this->agendaService->addAgendaItem($token, $agendaData, $data['actor'] ?? null, $lang);
-				if ($result['success']) {
-					$event->addAnswer($result['message'], true);
+				
+				// Check if we should use emoji reaction for single agenda in minimal mode
+				$reactionEmoji = $this->getEmojiReactionForSingleAgenda($token, $result);
+				if ($reactionEmoji) {
+					$this->sendEmojiReaction($event, $reactionEmoji);
 				} else {
 					$event->addAnswer($result['message'], true);
 				}
@@ -514,11 +533,23 @@ class BotInvokeListener implements IEventListener {
 			case 'config_auto':
 				return $this->handleConfigAuto($command['token'], $command['action'] ?? 'show', $command['param1'] ?? null, $actorData ?: null, $lang);
 
-			case 'config_emojis':
-				return $this->handleConfigEmojis($command['token'], $command['action'] ?? 'show', $command['param1'] ?? null, $command['param2'] ?? null, $actorData ?: null, $lang);
+		case 'config_emojis':
+			return $this->handleConfigEmojis($command['token'], $command['action'] ?? 'show', $command['param1'] ?? null, $command['param2'] ?? null, $actorData ?: null, $lang);
 
-			default:
-				return null;
+	case 'config_template':
+		return $this->handleConfigTemplate($command['token'], $command['action'] ?? 'show', $command['param1'] ?? null, $actorData ?: null, $lang);
+
+	case 'config_export':
+		return $this->handleConfigExport($command['token'], $actorData ?: null, $lang);
+
+	case 'bulk_config':
+	return $this->handleBulkConfig($command['token'], $command['message'], $actorData ?: null, $lang);
+
+	case 'config_reset':
+		return $this->handleConfigReset($command['token'], $command['section'] ?? null, $actorData ?: null, $lang);
+
+	default:
+		return null;
 		}
 	}
 	
@@ -560,6 +591,7 @@ class BotInvokeListener implements IEventListener {
 		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
 		
 		// Get all configuration areas
+		$templateConfig = $this->roomConfigService->getTemplateConfig($token);
 		$timeConfig = $this->roomConfigService->getTimeMonitoringConfig($token);
 		$responseConfig = $this->roomConfigService->getResponseConfig($token);
 		$limitsConfig = $this->roomConfigService->getAgendaLimitsConfig($token);
@@ -567,6 +599,21 @@ class BotInvokeListener implements IEventListener {
 		$emojisConfig = $this->roomConfigService->getEmojisConfig($token);
 		
 		$output = "### ⚙️ " . $l->t('Room Configuration') . "\n";
+		
+		// Template section (first)
+		$output .= "\n##### 📋 " . $l->t('Configuration Templates') . "\n";
+		if ($templateConfig && isset($templateConfig['template_name'])) {
+			$templateDisplayName = $this->getTemplateDisplayName($templateConfig['template_name'], $l);
+			$output .= "• **" . $l->t('Active Template') . "**: ✅ " . $templateDisplayName . " (`" . $templateConfig['template_name'] . "`)\n";
+			if ($templateConfig['configured_by'] ?? null) {
+				$configDate = date('Y-m-d H:i', $templateConfig['applied_at'] ?? time());
+				$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . $templateConfig['configured_by'] . " (" . $configDate . ")\n";
+			}
+		} else {
+			$output .= "• **" . $l->t('Active Template') . "**: ❌ " . $l->t('None - using individual settings') . "\n";
+			$output .= "• **" . $l->t('Configured by') . "**: 🔧 " . $l->t('Individual configuration') . "\n";
+		}
+		$output .= "💡 " . $l->t('Use `config template list` for available templates') . "\n";
 		
 		// Time monitoring section
 		$output .= "\n##### 🕙 " . $l->t('Time Monitoring') . "\n";
@@ -645,6 +692,10 @@ class BotInvokeListener implements IEventListener {
 		$output .= "💡 " . $l->t('Use `config emojis` for custom emojis configuration help') . "\n";
 		
 		$output .= "\n---\n";
+		// Add export hint for moderators
+		if (!empty($actorData) && $this->permissionService->isActorModerator($token, $actorData)) {
+			$output .= "📋 " . $l->t('Use `config export` to copy this configuration to another room') . "\n";
+		}
 		$output .= "🔒 " . $l->t('Only moderators and owners can modify room configuration') . "\n";
 		
 		return $output;
@@ -688,25 +739,79 @@ class BotInvokeListener implements IEventListener {
 				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
 					return $this->permissionService->getPermissionDeniedMessage($l->t('configure agenda limits'), $lang);
 				}
+				// Get current value before changing
+				$currentConfig = $this->roomConfigService->getAgendaLimitsConfig($token);
+				$previousValue = $currentConfig['max_items'];
+				
 				$userId = $this->extractUserIdFromActorData($actorData);
 				$this->roomConfigService->setAgendaLimitsConfig($token, ['max_items' => $param1], $userId);
-				return "✅ " . $l->t('Maximum total items set to: %d', [$param1]);
+				
+				// Get the actual stored value (after validation/clamping)
+				$newConfig = $this->roomConfigService->getAgendaLimitsConfig($token);
+				$actualValue = $newConfig['max_items'];
+				
+				$response = "";
+				if ($actualValue != $param1) {
+					$response = "⚠️ " . $l->t('Value clamped to valid range (5-100).') . " ";
+				}
+				
+				if ($previousValue != $actualValue) {
+					return $response . "✅ " . $l->t('Maximum total items set to: %d', [$actualValue]) . " *(" . $l->t('before: %d', [$previousValue]) . ")*";
+				} else {
+					return $response . "✅ " . $l->t('Maximum total items: %d', [$actualValue]) . " *(" . $l->t('unchanged') . ")*";
+				}
 				
 			case 'max-bulk':
 				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
 					return $this->permissionService->getPermissionDeniedMessage($l->t('configure agenda limits'), $lang);
 				}
+				// Get current value before changing
+				$currentConfig = $this->roomConfigService->getAgendaLimitsConfig($token);
+				$previousValue = $currentConfig['max_bulk_items'];
+				
 				$userId = $this->extractUserIdFromActorData($actorData);
 				$this->roomConfigService->setAgendaLimitsConfig($token, ['max_bulk_items' => $param1], $userId);
-				return "✅ " . $l->t('Maximum bulk operation items set to: %d', [$param1]);
+				
+				// Get the actual stored value (after validation/clamping)
+				$newConfig = $this->roomConfigService->getAgendaLimitsConfig($token);
+				$actualValue = $newConfig['max_bulk_items'];
+				
+				$response = "";
+				if ($actualValue != $param1) {
+					$response = "⚠️ " . $l->t('Value clamped to valid range (3-50).') . " ";
+				}
+				
+				if ($previousValue != $actualValue) {
+					return $response . "✅ " . $l->t('Maximum bulk operation items set to: %d', [$actualValue]) . " *(" . $l->t('before: %d', [$previousValue]) . ")*";
+				} else {
+					return $response . "✅ " . $l->t('Maximum bulk operation items: %d', [$actualValue]) . " *(" . $l->t('unchanged') . ")*";
+				}
 				
 			case 'default-duration':
 				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
 					return $this->permissionService->getPermissionDeniedMessage($l->t('configure agenda limits'), $lang);
 				}
+				// Get current value before changing
+				$currentConfig = $this->roomConfigService->getAgendaLimitsConfig($token);
+				$previousValue = $currentConfig['default_duration'];
+				
 				$userId = $this->extractUserIdFromActorData($actorData);
 				$this->roomConfigService->setAgendaLimitsConfig($token, ['default_duration' => $param1], $userId);
-				return "✅ " . $l->t('Default item duration set to: %d minutes', [$param1]);
+				
+				// Get the actual stored value (after validation/clamping)
+				$newConfig = $this->roomConfigService->getAgendaLimitsConfig($token);
+				$actualValue = $newConfig['default_duration'];
+				
+				$response = "";
+				if ($actualValue != $param1) {
+					$response = "⚠️ " . $l->t('Value clamped to valid range (1-120 minutes).') . " ";
+				}
+				
+				if ($previousValue != $actualValue) {
+					return $response . "✅ " . $l->t('Default item duration set to: %d minutes', [$actualValue]) . " *(" . $l->t('before: %d', [$previousValue]) . ")*";
+				} else {
+					return $response . "✅ " . $l->t('Default item duration: %d minutes', [$actualValue]) . " *(" . $l->t('unchanged') . ")*";
+				}
 				
 			case 'reset':
 				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
@@ -797,25 +902,61 @@ class BotInvokeListener implements IEventListener {
 				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
 					return $this->permissionService->getPermissionDeniedMessage($l->t('configure auto-behaviors'), $lang);
 				}
+				// Get current value before changing
+				$currentConfig = $this->roomConfigService->getAutoBehaviorsConfig($token);
+				$previousValue = $currentConfig['start_agenda'];
+				
 				$userId = $this->extractUserIdFromActorData($actorData);
 				$this->roomConfigService->setAutoBehaviorsConfig($token, ['start_agenda' => $param1], $userId);
-				return "✅ " . $l->t('Auto-start agenda on call: %s', [$param1 ? $l->t('Enabled') : $l->t('Disabled')]);
+				
+				if ($previousValue != $param1) {
+					$newStatus = $param1 ? $l->t('Enabled') : $l->t('Disabled');
+					$oldStatus = $previousValue ? $l->t('Enabled') : $l->t('Disabled');
+					return "✅ " . $l->t('Auto-start agenda on call: %s', [$newStatus]) . " *(" . $l->t('before: %s', [$oldStatus]) . ")*";
+				} else {
+					$status = $param1 ? $l->t('Enabled') : $l->t('Disabled');
+					return "✅ " . $l->t('Auto-start agenda on call: %s', [$status]) . " *(" . $l->t('unchanged') . ")*";
+				}
 				
 			case 'cleanup':
 				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
 					return $this->permissionService->getPermissionDeniedMessage($l->t('configure auto-behaviors'), $lang);
 				}
+				// Get current value before changing
+				$currentConfig = $this->roomConfigService->getAutoBehaviorsConfig($token);
+				$previousValue = $currentConfig['cleanup'];
+				
 				$userId = $this->extractUserIdFromActorData($actorData);
 				$this->roomConfigService->setAutoBehaviorsConfig($token, ['cleanup' => $param1], $userId);
-				return "✅ " . $l->t('Auto-cleanup completed items: %s', [$param1 ? $l->t('Enabled') : $l->t('Disabled')]);
+				
+				if ($previousValue != $param1) {
+					$newStatus = $param1 ? $l->t('Enabled') : $l->t('Disabled');
+					$oldStatus = $previousValue ? $l->t('Enabled') : $l->t('Disabled');
+					return "✅ " . $l->t('Auto-cleanup completed items: %s', [$newStatus]) . " *(" . $l->t('before: %s', [$oldStatus]) . ")*";
+				} else {
+					$status = $param1 ? $l->t('Enabled') : $l->t('Disabled');
+					return "✅ " . $l->t('Auto-cleanup completed items: %s', [$status]) . " *(" . $l->t('unchanged') . ")*";
+				}
 				
 			case 'summary':
 				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
 					return $this->permissionService->getPermissionDeniedMessage($l->t('configure auto-behaviors'), $lang);
 				}
+				// Get current value before changing
+				$currentConfig = $this->roomConfigService->getAutoBehaviorsConfig($token);
+				$previousValue = $currentConfig['summary'];
+				
 				$userId = $this->extractUserIdFromActorData($actorData);
 				$this->roomConfigService->setAutoBehaviorsConfig($token, ['summary' => $param1], $userId);
-				return "✅ " . $l->t('Auto-generate summaries: %s', [$param1 ? $l->t('Enabled') : $l->t('Disabled')]);
+				
+				if ($previousValue != $param1) {
+					$newStatus = $param1 ? $l->t('Enabled') : $l->t('Disabled');
+					$oldStatus = $previousValue ? $l->t('Enabled') : $l->t('Disabled');
+					return "✅ " . $l->t('Generate summaries on call end: %s', [$newStatus]) . " *(" . $l->t('before: %s', [$oldStatus]) . ")*";
+				} else {
+					$status = $param1 ? $l->t('Enabled') : $l->t('Disabled');
+					return "✅ " . $l->t('Generate summaries on call end: %s', [$status]) . " *(" . $l->t('unchanged') . ")*";
+				}
 				
 			case 'reset':
 				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
@@ -886,9 +1027,19 @@ class BotInvokeListener implements IEventListener {
 					return "❌ " . $l->t('Unknown emoji type') . ": " . $param1;
 				}
 				$configKey = $emojiKeyMap[$param1];
+				
+				// Get current value before changing
+				$currentConfig = $this->roomConfigService->getEmojisConfig($token);
+				$previousEmoji = $currentConfig[$configKey];
+				
 				$userId = $this->extractUserIdFromActorData($actorData);
 				$this->roomConfigService->setEmojisConfig($token, [$configKey => $param2], $userId);
-				return "✅ " . $l->t('Emoji for \"%s\" set to: %s', [str_replace('-', ' ', $param1), $param2]);
+				
+				if ($previousEmoji !== $param2) {
+					return "✅ " . $l->t('Emoji for \"%s\" set to: %s', [str_replace('-', ' ', $param1), $param2]) . " *(" . $l->t('before: %s', [$previousEmoji]) . ")*";
+				} else {
+					return "✅ " . $l->t('Emoji for \"%s\": %s', [str_replace('-', ' ', $param1), $param2]) . " *(" . $l->t('unchanged') . ")*";
+				}
 				
 			case 'reset':
 				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
@@ -947,40 +1098,108 @@ class BotInvokeListener implements IEventListener {
 				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
 					return $this->permissionService->getPermissionDeniedMessage($l->t('configure time monitoring settings'), $lang);
 				}
+				// Get current value before changing
+				$currentConfig = $this->roomConfigService->getTimeMonitoringConfig($token);
+				$previousEnabled = $currentConfig['enabled'];
+				
 				$enabled = $action === 'enable';
 				$userId = $this->extractUserIdFromActorData($actorData);
 				$this->roomConfigService->setRoomTimeMonitoringConfig($token, ['enabled' => $enabled], $userId);
-				return "✅ " . $l->t('Time monitoring: %s', [$enabled ? $l->t('Enabled') : $l->t('Disabled')]);
+				
+				if ($previousEnabled != $enabled) {
+					$newStatus = $enabled ? $l->t('Enabled') : $l->t('Disabled');
+					$oldStatus = $previousEnabled ? $l->t('Enabled') : $l->t('Disabled');
+					return "✅ " . $l->t('Time monitoring: %s', [$newStatus]) . " *(" . $l->t('before: %s', [$oldStatus]) . ")*";
+				} else {
+					$status = $enabled ? $l->t('Enabled') : $l->t('Disabled');
+					return "✅ " . $l->t('Time monitoring: %s', [$status]) . " *(" . $l->t('unchanged') . ")*";
+				}
 				
 			case 'warning':
 				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
 					return $this->permissionService->getPermissionDeniedMessage($l->t('configure time monitoring settings'), $lang);
 				}
+				// Get current value before changing
+				$currentConfig = $this->roomConfigService->getTimeMonitoringConfig($token);
+				$previousThreshold = round($currentConfig['warning_threshold'] * 100);
+				
 				$threshold = ($param1 ?? 80) / 100.0;
 				$userId = $this->extractUserIdFromActorData($actorData);
 				$this->roomConfigService->setRoomTimeMonitoringConfig($token, ['warning_threshold' => $threshold], $userId);
-				return "✅ " . $l->t('Warning threshold set to: %d%%', [$param1]);
+				
+				// Get the actual stored value (after validation/clamping)
+				$newConfig = $this->roomConfigService->getTimeMonitoringConfig($token);
+				$actualThreshold = round($newConfig['warning_threshold'] * 100);
+				
+				$response = "";
+				if ($actualThreshold != $param1) {
+					$response = "⚠️ " . $l->t('Value clamped to valid range (10-95%%).') . " ";
+				}
+				
+				if ($previousThreshold != $actualThreshold) {
+					return $response . "✅ " . $l->t('Warning threshold set to: %d%%', [$actualThreshold]) . " *(" . $l->t('before: %d%%', [$previousThreshold]) . ")*";
+				} else {
+					return $response . "✅ " . $l->t('Warning threshold: %d%%', [$actualThreshold]) . " *(" . $l->t('unchanged') . ")*";
+				}
 				
 			case 'overtime':
 				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
 					return $this->permissionService->getPermissionDeniedMessage($l->t('configure time monitoring settings'), $lang);
 				}
+				// Get current value before changing
+				$currentConfig = $this->roomConfigService->getTimeMonitoringConfig($token);
+				$previousThreshold = round($currentConfig['overtime_threshold'] * 100);
+				
 				$threshold = ($param1 ?? 120) / 100.0;
 				$userId = $this->extractUserIdFromActorData($actorData);
 				$this->roomConfigService->setRoomTimeMonitoringConfig($token, ['overtime_threshold' => $threshold], $userId);
-				return "✅ " . $l->t('Overtime threshold set to: %d%%', [$param1]);
+				
+				// Get the actual stored value (after validation/clamping)
+				$newConfig = $this->roomConfigService->getTimeMonitoringConfig($token);
+				$actualThreshold = round($newConfig['overtime_threshold'] * 100);
+				
+				$response = "";
+				if ($actualThreshold != $param1) {
+					$response = "⚠️ " . $l->t('Value clamped to valid range (105-300%%).') . " ";
+				}
+				
+				if ($previousThreshold != $actualThreshold) {
+					return $response . "✅ " . $l->t('Overtime threshold set to: %d%%', [$actualThreshold]) . " *(" . $l->t('before: %d%%', [$previousThreshold]) . ")*";
+				} else {
+					return $response . "✅ " . $l->t('Overtime threshold: %d%%', [$actualThreshold]) . " *(" . $l->t('unchanged') . ")*";
+				}
 				
 			case 'thresholds':
 				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
 					return $this->permissionService->getPermissionDeniedMessage($l->t('configure time monitoring settings'), $lang);
 				}
+				// Get current values before changing
+				$currentConfig = $this->roomConfigService->getTimeMonitoringConfig($token);
+				$previousWarning = round($currentConfig['warning_threshold'] * 100);
+				$previousOvertime = round($currentConfig['overtime_threshold'] * 100);
+				
 				$config = [
 					'warning_threshold' => ($param1 ?? 80) / 100.0,
 					'overtime_threshold' => ($param2 ?? 120) / 100.0
 				];
 				$userId = $this->extractUserIdFromActorData($actorData);
 				$this->roomConfigService->setRoomTimeMonitoringConfig($token, $config, $userId);
-				return "✅ " . $l->t('Thresholds set to: %d%% warning, %d%% overtime', [$param1, $param2]);
+				
+				// Get the actual stored values (after validation/clamping)
+				$newConfig = $this->roomConfigService->getTimeMonitoringConfig($token);
+				$actualWarning = round($newConfig['warning_threshold'] * 100);
+				$actualOvertime = round($newConfig['overtime_threshold'] * 100);
+				
+				$response = "";
+				if ($actualWarning != $param1 || $actualOvertime != $param2) {
+					$response = "⚠️ " . $l->t('Values clamped to valid ranges (warning: 10-95%%, overtime: 105-300%%).') . " ";
+				}
+				
+				if ($previousWarning != $actualWarning || $previousOvertime != $actualOvertime) {
+					return $response . "✅ " . $l->t('Thresholds set to: %d%% warning, %d%% overtime', [$actualWarning, $actualOvertime]) . " *(" . $l->t('before: %d%%/%d%%', [$previousWarning, $previousOvertime]) . ")*";
+				} else {
+					return $response . "✅ " . $l->t('Thresholds set to: %d%% warning, %d%% overtime', [$actualWarning, $actualOvertime]) . " *(" . $l->t('unchanged') . ")*";
+				}
 				
 			case 'reset':
 				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
@@ -1039,17 +1258,37 @@ class BotInvokeListener implements IEventListener {
 				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
 					return $this->permissionService->getPermissionDeniedMessage($l->t('configure response settings'), $lang);
 				}
+				// Get current value before changing
+				$currentConfig = $this->roomConfigService->getResponseConfig($token);
+				$previousMode = $currentConfig['response_mode'];
+				
 				$userId = $this->extractUserIdFromActorData($actorData);
 				$this->roomConfigService->setResponseConfig($token, ['response_mode' => 'normal'], $userId);
-				return "✅ " . $l->t('Response mode set to: Normal (full responses)');
+				
+				if ($previousMode !== 'normal') {
+					$oldModeText = $previousMode === 'minimal' ? $l->t('Minimal (reduced notifications)') : $l->t('Normal (full responses)');
+					return "✅ " . $l->t('Response mode set to: Normal (full responses)') . " *(" . $l->t('before: %s', [$oldModeText]) . ")*";
+				} else {
+					return "✅ " . $l->t('Response mode set to: Normal (full responses)') . " *(" . $l->t('unchanged') . ")*";
+				}
 				
 			case 'minimal':
 				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
 					return $this->permissionService->getPermissionDeniedMessage($l->t('configure response settings'), $lang);
 				}
+				// Get current value before changing
+				$currentConfig = $this->roomConfigService->getResponseConfig($token);
+				$previousMode = $currentConfig['response_mode'];
+				
 				$userId = $this->extractUserIdFromActorData($actorData);
 				$this->roomConfigService->setResponseConfig($token, ['response_mode' => 'minimal'], $userId);
-				return "✅ " . $l->t('Response mode set to: Minimal (reduced notifications)');
+				
+				if ($previousMode !== 'minimal') {
+					$oldModeText = $previousMode === 'minimal' ? $l->t('Minimal (reduced notifications)') : $l->t('Normal (full responses)');
+					return "✅ " . $l->t('Response mode set to: Minimal (reduced notifications)') . " *(" . $l->t('before: %s', [$oldModeText]) . ")*";
+				} else {
+					return "✅ " . $l->t('Response mode set to: Minimal (reduced notifications)') . " *(" . $l->t('unchanged') . ")*";
+				}
 				
 			case 'reset':
 				if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
@@ -1065,5 +1304,759 @@ class BotInvokeListener implements IEventListener {
 			default:
 				return "❌ " . $l->t('Unknown response action') . ": " . $action;
 		}
+	}
+
+	/**
+	 * Handle bulk configuration commands with dynamic grouped output
+	 */
+	private function handleBulkConfig(string $token, string $message, ?array $actorData, string $lang): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
+		// Parse the bulk commands
+		$commands = $this->commandParser->parseBulkCommands($message, $token);
+		
+		if (empty($commands)) {
+			return "❌ " . $l->t('No valid configuration commands found');
+		}
+		
+		// Dynamic groups based on config commands
+		$groups = [];
+		$errors = [];
+		$successCount = 0;
+		$errorCount = 0;
+		
+		// Process each command sequentially
+		foreach ($commands as $cmd) {
+			if ($cmd['command'] === 'invalid') {
+				$errorCount++;
+				$errorMessage = $cmd['error'];
+				
+				// Add suggestion if available
+				if (!empty($cmd['suggestion'])) {
+					$errorMessage .= " — " . $cmd['suggestion'];
+				}
+				
+				$errors[] = "❌ " . $l->t('Line %d', [$cmd['line_number']]) . ": " . $errorMessage . "\n   `" . $cmd['original_line'] . "`";
+				continue;
+			}
+			
+			try {
+				// Handle individual command
+				$response = $this->handleCommand($cmd, $actorData, $lang);
+				
+				if ($response !== null && !str_starts_with($response, '❌')) {
+					$successCount++;
+					$cleanResponse = trim(str_replace(['✅', '❌', 'ℹ️'], '', $response));
+					
+					// Extract group name from command or original line
+					$groupName = $this->extractGroupName($cmd);
+					$groups[$groupName][] = '• ' . $cleanResponse;
+				} else {
+					$errorCount++;
+					$errorMessage = $response ? trim(str_replace(['✅', '❌', 'ℹ️'], '', $response)) : $l->t('Command failed');
+					$errors[] = "❌ " . $l->t('Line %d', [$cmd['line_number']]) . ": " . $errorMessage;
+				}
+			} catch (\Exception $e) {
+				$errorCount++;
+				$errors[] = "❌ " . $l->t('Line %d', [$cmd['line_number']]) . ": " . $l->t('Error processing command') . " - " . $e->getMessage();
+			}
+		}
+		
+		// Build grouped output
+		return $this->buildDynamicGroupOutput($groups, $errors, $successCount, $errorCount, $l);
+	}
+	
+	/**
+	 * Extract group name from command structure
+	 */
+	private function extractGroupName(array $cmd): string {
+		// For config_xxx commands, extract the xxx part
+		if (str_starts_with($cmd['command'], 'config_')) {
+			return substr($cmd['command'], 7); // Remove 'config_' prefix
+		}
+		
+		// For legacy time commands, group under 'time'
+		if (str_starts_with($cmd['command'], 'time_')) {
+			return 'time';
+		}
+		
+		// Extract from original line - look for "config [groupname]"
+		if (isset($cmd['original_line']) && preg_match('/^config\s+(\w+)/', $cmd['original_line'], $matches)) {
+			return $matches[1];
+		}
+		
+		// Fallback
+		return 'other';
+	}
+	
+	/**
+	 * Build dynamic group output with proper localized headers
+	 */
+	private function buildDynamicGroupOutput(array $groups, array $errors, int $successCount, int $errorCount, $l): string {
+		$totalCommands = $successCount + $errorCount;
+		$output = "✅ **" . $l->t('Bulk Configuration Applied') . "** (" . $l->t('%d commands processed', [$totalCommands]) . ")\n\n";
+		
+		// Group name to localized title mapping
+		$groupTitles = [
+			'limits' => $l->t('Agenda Limits'),
+			'time' => $l->t('Time Monitoring'),
+			'auto' => $l->t('Auto-Behaviors'),
+			'response' => $l->t('Response Mode'),
+			'emojis' => $l->t('Custom Emojis'),
+			'other' => $l->t('Other Settings')
+		];
+		
+		// Display groups in preferred order
+		$preferredOrder = ['time', 'response', 'limits', 'auto', 'emojis', 'other'];
+		
+		foreach ($preferredOrder as $groupName) {
+			if (!empty($groups[$groupName])) {
+				$title = $groupTitles[$groupName] ?? ucfirst($groupName);
+				$output .= "**" . $title . "**:\n" . implode("\n", $groups[$groupName]) . "\n\n";
+			}
+		}
+		
+		// Add any remaining groups not in preferred order
+		foreach ($groups as $groupName => $items) {
+			if (!in_array($groupName, $preferredOrder) && !empty($items)) {
+				$title = $groupTitles[$groupName] ?? ucfirst($groupName);
+				$output .= "**" . $title . "**:\n" . implode("\n", $items) . "\n\n";
+			}
+		}
+		
+		// Show errors if any
+		if (!empty($errors)) {
+			$output .= "**" . $l->t('Errors') . "**:\n" . implode("\n", $errors) . "\n\n";
+		}
+		
+		// Summary
+		if ($errorCount === 0) {
+			$output .= "🎉 " . $l->t('All configuration commands completed successfully!');
+		} elseif ($successCount > 0) {
+			$output .= "⚠️ " . $l->t('Mixed results: %d succeeded, %d failed', [$successCount, $errorCount]);
+			if ($errorCount > 0) {
+				$output .= "\n💡 " . $l->t('Tip: Use `config show` to view current configuration and `agenda help` for command syntax');
+			}
+		} else {
+			$output .= "❌ " . $l->t('All configuration commands failed');
+			$output .= "\n💡 " . $l->t('Tip: Use `config show` to view current configuration and `agenda help` for command syntax');
+		}
+		
+		return $output;
+	}
+	
+	/**
+	 * Handle config template commands (standalone, not part of bulk config)
+	 */
+	private function handleConfigTemplate(string $token, string $action, ?string $templateName, ?array $actorData, string $lang): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
+		switch ($action) {
+			case 'list':
+				return $this->getTemplateList($l);
+				
+			case 'show':
+				return $this->getTemplateConfiguration($token, $l, $lang);
+				
+			case 'apply':
+				if (!$templateName) {
+					return "❌ " . $l->t('Template name required') . ". " . $l->t('Use `config template list` to see available templates');
+				}
+				if ($templateName === 'none') {
+					return $this->resetTemplate($token, $actorData, $l, $lang);
+				}
+				return $this->applyConfigurationTemplate($token, $templateName, $actorData, $l, $lang);
+				
+			default:
+				return "❌ " . $l->t('Unknown template action') . ": " . $action;
+		}
+	}
+	
+	/**
+	 * Get list of available configuration templates in simple list format
+	 */
+	private function getTemplateList($l): string {
+		$output = "### 📋 " . $l->t('Available Configuration Templates') . "\n\n";
+		
+		$templates = $this->getTemplateCommandLists();
+		$descriptions = [
+			'formal' => $l->t('Professional business meetings with structured time management'),
+			'jour-fixe' => $l->t('Regular recurring meetings with balanced settings'),
+			'workshop' => $l->t('Extended collaborative sessions with flexible timing'),
+			'brainstorm' => $l->t('Creative ideation meetings with minimal constraints'),
+			'training' => $l->t('Educational sessions with structured progress tracking')
+		];
+		
+		$counter = 1;
+		foreach ($templates as $name => $commandList) {
+			$displayName = $this->getTemplateDisplayName($name, $l);
+			$description = $descriptions[$name];
+			$command = "`config template $name`";
+			
+			// Build settings summary from commands
+			$settingsSummary = $this->buildSettingsSummaryFromCommands($commandList, $l);
+			
+			// Create entry
+			$output .= "**$counter. $displayName**\n";
+			$output .= "📝 *$description*\n";
+			$output .= "⚙️ $settingsSummary\n";
+			$output .= "💻 $command\n\n";
+			
+			$counter++;
+		}
+		
+		// Add the reset option
+		$output .= "**$counter. " . $l->t('Reset Template') . "**\n";
+		$output .= "📝 *" . $l->t('Remove current template configuration') . "*\n";
+		$output .= "⚙️ " . $l->t('Clears template') . "\n";
+		$output .= "💻 `config template none`\n\n";
+		
+		return $output;
+	}
+	
+	/**
+	 * Reset/remove template configuration
+	 */
+	private function resetTemplate(string $token, ?array $actorData, $l, string $lang): string {
+		// Check moderator permissions
+		if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+			return $this->permissionService->getPermissionDeniedMessage($l->t('reset template configuration'), $lang);
+		}
+		
+		// Reset template configuration
+		$reset = $this->roomConfigService->resetTemplateConfig($token);
+		if ($reset) {
+			return '✅ ' . $l->t('Template configuration reset - room now uses individual settings');
+		} else {
+			return 'ℹ️ ' . $l->t('No active template found to reset');
+		}
+	}
+	
+	/**
+	 * Get current template configuration status (similar to other config commands)
+	 */
+	private function getTemplateConfiguration(string $token, $l, string $lang): string {
+		$templateConfig = $this->roomConfigService->getTemplateConfig($token);
+		$output = "### 📋 " . $l->t('Configuration Templates') . "\n\n";
+		
+		if ($templateConfig && isset($templateConfig['template_name'])) {
+			$templateDisplayName = $this->getTemplateDisplayName($templateConfig['template_name'], $l);
+			$output .= "• **" . $l->t('Active Template') . "**: " . $templateDisplayName . "\n";
+			
+			if ($templateConfig['configured_by'] ?? null) {
+				$configDate = date('Y-m-d H:i', $templateConfig['applied_at'] ?? time());
+				$output .= "• **" . $l->t('Configured by') . "**: ✏️ " . $templateConfig['configured_by'] . " (" . $configDate . ")\n";
+			} else {
+				$output .= "• **" . $l->t('Configured by') . "**: 🌐 " . $l->t('Global defaults') . "\n";
+			}
+		} else {
+			$output .= "• **" . $l->t('Active Template') . "**: " . $l->t('None - using individual settings') . "\n";
+			$output .= "• **" . $l->t('Configured by') . "**: " . $l->t('Individual configuration') . "\n";
+		}
+		
+		$output .= "\n---\n";
+		$output .= "💡 **" . $l->t('Available Commands') . ":**\n";
+		$output .= "• `config template list` — " . $l->t('Show all available templates') . "\n";
+		$output .= "• `config template formal` — " . $l->t('Apply a specific template') . "\n";
+		$output .= "• `config template none` — " . $l->t('Remove current template configuration') . "\n";
+		$output .= "\n🔒 " . $l->t('Only moderators/owners can apply configuration templates') . "\n";
+		$output .= "\n💡 " . $l->t('Use `config template list` for available templates') . "\n";
+		
+		return $output;
+	}
+	
+	/**
+	 * Get template help and usage information
+	 */
+	private function getTemplateHelp($l): string {
+		return "### 📋 " . $l->t('Configuration Templates') . "\n\n" .
+			   "**" . $l->t('Usage') . ":**\n" .
+			   "• `config template list` - " . $l->t('Show all available templates') . "\n" .
+			   "• `config template [name]` - " . $l->t('Apply a specific template') . "\n\n" .
+			   "💡 " . $l->t('Use `config template list` to see available templates and their descriptions');
+	}
+	
+	/**
+	 * Apply a configuration template to the room by converting it to bulk commands
+	 */
+	private function applyConfigurationTemplate(string $token, string $templateName, ?array $actorData, $l, string $lang): string {
+		// Check moderator permissions
+		if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+			return $this->permissionService->getPermissionDeniedMessage($l->t('apply configuration templates'), $lang);
+		}
+		
+		$templates = $this->getTemplateCommandLists();
+		
+		if (!isset($templates[$templateName])) {
+			return "❌ " . $l->t('Unknown template') . ": $templateName. " . $l->t('Use `config template list` to see available templates');
+		}
+		
+		// Get the command list for this template
+		$commandList = $templates[$templateName];
+		
+		// Convert command list to bulk configuration message
+		$bulkMessage = implode("\n", $commandList);
+		
+		// Use existing bulk config handler with proper language
+		$result = $this->handleBulkConfig($token, $bulkMessage, $actorData, $lang);
+		
+		// Store the template information after successful application
+		$userId = $this->extractUserIdFromActorData($actorData);
+		$this->roomConfigService->setTemplateConfig($token, $templateName, $userId);
+		
+		// Modify the bulk config output to show it was from a template
+		$templateDisplayName = $this->getTemplateDisplayName($templateName, $l);
+		$result = str_replace(
+			'✅ **' . $l->t('Bulk Configuration Applied') . '**',
+			'✅ **' . $l->t('Template Applied') . '**: ' . $templateDisplayName,
+			$result
+		);
+		
+		return $result;
+	}
+	
+	/**
+	 * Build settings summary from command list for template display
+	 */
+	private function buildSettingsSummaryFromCommands(array $commandList, $l): string {
+		// Initialize defaults
+		$timeEnabled = false;
+		$timeThresholds = [80, 120];
+		$responseMode = 'normal';
+		$maxItems = 50;
+		$maxBulk = 25;
+		$defaultDuration = 10;
+		$startAgenda = false;
+		$autoCleanup = false;
+		$autoSummary = false;
+		
+		// Parse commands to extract all settings
+		foreach ($commandList as $command) {
+			if (str_contains($command, 'config time enable')) {
+				$timeEnabled = true;
+			} elseif (str_contains($command, 'config time disable')) {
+				$timeEnabled = false;
+			} elseif (preg_match('/config time thresholds (\d+) (\d+)/', $command, $matches)) {
+				$timeThresholds = [(int)$matches[1], (int)$matches[2]];
+			} elseif (str_contains($command, 'config response minimal')) {
+				$responseMode = 'minimal';
+			} elseif (str_contains($command, 'config response normal')) {
+				$responseMode = 'normal';
+			} elseif (preg_match('/config limits max-items (\d+)/', $command, $matches)) {
+				$maxItems = (int)$matches[1];
+			} elseif (preg_match('/config limits max-bulk (\d+)/', $command, $matches)) {
+				$maxBulk = (int)$matches[1];
+			} elseif (preg_match('/config limits default-duration (\d+)/', $command, $matches)) {
+				$defaultDuration = (int)$matches[1];
+			} elseif (str_contains($command, 'config auto start-agenda enable')) {
+				$startAgenda = true;
+			} elseif (str_contains($command, 'config auto cleanup enable')) {
+				$autoCleanup = true;
+			} elseif (str_contains($command, 'config auto summary enable')) {
+				$autoSummary = true;
+			}
+		}
+		
+		// Build comprehensive settings summary with proper section names
+		$parts = [];
+		
+		// Time monitoring section
+		if ($timeEnabled) {
+			$parts[] = $l->t('Time: Enabled+%d%%/%d%%', $timeThresholds);
+		} else {
+			$parts[] = $l->t('Time: Disabled');
+		}
+		
+		// Response section
+		$parts[] = $l->t('Response: %s', [ucfirst($responseMode)]);
+		
+		// Limits section (show comprehensive limits info)
+		$limitsInfo = [];
+		if ($maxItems != 50) $limitsInfo[] = $maxItems . ' items';
+		if ($maxBulk != 25) $limitsInfo[] = $maxBulk . ' bulk';
+		if ($defaultDuration != 10) $limitsInfo[] = $defaultDuration . 'min default';
+		
+		if (!empty($limitsInfo)) {
+			$parts[] = $l->t('Limits: %s', [implode('+', $limitsInfo)]);
+		}
+		
+		// Auto-behaviors section
+		$autoIndicators = [];
+		if ($startAgenda) $autoIndicators[] = 'Start';
+		if ($autoCleanup) $autoIndicators[] = 'Clean';
+		if ($autoSummary) $autoIndicators[] = 'Summary';
+		
+		if (!empty($autoIndicators)) {
+			$parts[] = $l->t('Auto: %s', [implode('+', $autoIndicators)]);
+		} else {
+			// Check if any auto-behaviors are explicitly disabled
+			$disabledAuto = [];
+			foreach ($commandList as $command) {
+				if (str_contains($command, 'config auto') && str_contains($command, 'disable')) {
+					if (str_contains($command, 'start-agenda')) $disabledAuto[] = 'Start';
+					if (str_contains($command, 'cleanup')) $disabledAuto[] = 'Clean';
+					if (str_contains($command, 'summary')) $disabledAuto[] = 'Summary';
+				}
+			}
+			if (!empty($disabledAuto)) {
+				$parts[] = $l->t('Auto: Disabled(%s)', [implode('+', $disabledAuto)]);
+			}
+		}
+		
+		// Extract custom emojis from commands
+		$emojis = [];
+		$emojiOrder = ['current-item', 'completed', 'pending', 'on-time', 'time-warning'];
+		foreach ($emojiOrder as $type) {
+			foreach ($commandList as $command) {
+				if (preg_match('/config emojis ' . preg_quote($type, '/') . ' (.+)/', $command, $matches)) {
+					$emojis[] = trim($matches[1]);
+					break;
+				}
+			}
+		}
+		if (!empty($emojis)) {
+			$parts[] = $l->t('Emojis: %s', [implode(', ', $emojis)]);
+		}
+		
+		return implode(' • ', $parts);
+	}
+	
+	/**
+	 * Get template command lists (templates defined as bulk config commands)
+	 * 
+	 * TODO: Move these hardcoded templates into app_config so admins can adapt/modify
+	 * the executed commands using occ config commands for better customization
+	 */
+	private function getTemplateCommandLists(): array {
+		return [
+			'formal' => [
+				'config time enable',
+				'config time thresholds 75 105',
+				'config response normal',
+				'config limits max-items 12',
+				'config limits max-bulk 12',
+				'config limits default-duration 10',
+				'config auto start-agenda enable',
+				'config auto cleanup disable',
+				'config auto summary enable',
+				// Professional, clear status indicators
+				'config emojis current-item 📋',
+				'config emojis completed ✅',
+				'config emojis pending ⏸️',
+				'config emojis on-time 👌',
+				'config emojis time-warning 🚨'
+			],
+			'jour-fixe' => [
+				'config time enable',
+				'config time thresholds 80 115',
+				'config response normal',
+				'config limits max-items 10',
+				'config limits max-bulk 10',
+				'config limits default-duration 15',
+				'config auto start-agenda enable',
+				'config auto cleanup enable',
+				'config auto summary enable',
+				// Balanced, routine-friendly indicators
+				'config emojis current-item 👉',
+				'config emojis completed ✔️',
+				'config emojis pending 📅',
+				'config emojis on-time 👍',
+				'config emojis time-warning ⏰'
+			],
+			'workshop' => [
+				'config time enable',
+				'config time thresholds 85 125',
+				'config response minimal',
+				'config limits max-items 20',
+				'config limits max-bulk 10',
+				'config limits default-duration 20',
+				'config auto start-agenda enable',
+				'config auto cleanup disable',
+				'config auto summary enable',
+				// Dynamic, engaging, collaborative feel
+				'config emojis current-item 🎯',
+				'config emojis completed 🎉',
+				'config emojis pending 🔧',
+				'config emojis on-time 💪',
+				'config emojis time-warning 📢'
+			],
+			'brainstorm' => [
+				'config time disable',
+				'config response minimal',
+				'config limits max-items 25',
+				'config limits max-bulk 15',
+				'config limits default-duration 15',
+				'config auto start-agenda disable',
+				'config auto cleanup disable',
+				'config auto summary disable',
+				// Creative, inspirational, fun atmosphere
+				'config emojis current-item 💭',
+				'config emojis completed 🌟',
+				'config emojis pending 💡',
+				'config emojis on-time 🚀',
+				'config emojis time-warning 🎪'
+			],
+			'training' => [
+				'config time enable',
+				'config time thresholds 70 110',
+				'config response normal',
+				'config limits max-items 30',
+				'config limits max-bulk 15',
+				'config limits default-duration 12',
+				'config auto start-agenda enable',
+				'config auto cleanup disable',
+				'config auto summary enable',
+				// Learning-focused, educational progress
+				'config emojis current-item 📖',
+				'config emojis completed 🎓',
+				'config emojis pending 📝',
+				'config emojis on-time ✨',
+				'config emojis time-warning 📚'
+			]
+		];
+	}
+	
+	/**
+	 * Get localized display name for template
+	 */
+	private function getTemplateDisplayName(string $templateName, $l): string {
+		$displayNames = [
+			'formal' => $l->t('Formal Business Meeting'),
+			'jour-fixe' => $l->t('Regular Jour Fixe'),
+			'workshop' => $l->t('Collaborative Workshop'),
+			'brainstorm' => $l->t('Creative Brainstorming'),
+			'training' => $l->t('Educational Training')
+		];
+		
+	return $displayNames[$templateName] ?? ucfirst($templateName);
+	}
+
+	/**
+	 * Handle config reset command - reset all or specific configuration areas
+	 */
+	private function handleConfigReset(string $token, ?string $section, ?array $actorData, string $lang): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
+		// Check moderator permissions
+		if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+			return $this->permissionService->getPermissionDeniedMessage($l->t('reset room configuration'), $lang);
+		}
+		
+		// If specific section requested, handle individual section reset
+		if ($section) {
+			switch ($section) {
+				case 'time':
+					return $this->handleConfigTime($token, 'reset', null, null, $actorData, $lang);
+				case 'response':
+					return $this->handleConfigResponse($token, 'reset', $actorData, $lang);
+				case 'limits':
+					return $this->handleConfigLimits($token, 'reset', null, $actorData, $lang);
+				case 'auto':
+					return $this->handleConfigAuto($token, 'reset', null, $actorData, $lang);
+				case 'emojis':
+					return $this->handleConfigEmojis($token, 'reset', null, null, $actorData, $lang);
+				case 'template':
+					return $this->resetTemplate($token, $actorData, $l, $lang);
+				default:
+					return "❌ " . $l->t('Unknown configuration section') . ": $section. " . $l->t('Available sections: time, response, limits, auto, emojis, template');
+			}
+		}
+		
+		// Global reset - reset all configuration areas
+		$results = [];
+		$errors = [];
+		$successCount = 0;
+		$errorCount = 0;
+		
+		// List of configuration areas to reset
+		$configAreas = [
+			'template' => $l->t('Configuration Templates'),
+			'time' => $l->t('Time Monitoring'),
+			'response' => $l->t('Response Mode'),
+			'limits' => $l->t('Agenda Limits'),
+			'auto' => $l->t('Auto-Behaviors'),
+			'emojis' => $l->t('Custom Emojis')
+		];
+		
+		// Reset each configuration area
+		foreach ($configAreas as $area => $title) {
+			try {
+				switch ($area) {
+					case 'template':
+						$resetResult = $this->roomConfigService->resetTemplateConfig($token);
+						break;
+					case 'time':
+						$resetResult = $this->roomConfigService->resetTimeMonitoringConfig($token);
+						break;
+					case 'response':
+						$resetResult = $this->roomConfigService->resetResponseConfig($token);
+						break;
+					case 'limits':
+						$resetResult = $this->roomConfigService->resetAgendaLimitsConfig($token);
+						break;
+					case 'auto':
+						$resetResult = $this->roomConfigService->resetAutoBehaviorsConfig($token);
+						break;
+					case 'emojis':
+						$resetResult = $this->roomConfigService->resetEmojisConfig($token);
+						break;
+					default:
+						$resetResult = false;
+				}
+				
+				if ($resetResult) {
+					$results[] = "• $title: " . $l->t('Reset to global defaults');
+					$successCount++;
+				} else {
+					$results[] = "• $title: " . $l->t('No custom configuration found') . " (" . $l->t('already using defaults') . ")";
+					$successCount++; // Count as success since it's already at defaults
+				}
+			} catch (\Exception $e) {
+				$errors[] = "• $title: " . $l->t('Reset failed') . " - " . $e->getMessage();
+				$errorCount++;
+			}
+		}
+		
+		// Build output
+		$totalAreas = count($configAreas);
+		$output = "✅ **" . $l->t('Global Configuration Reset') . "** (" . $l->t('%d areas processed', [$totalAreas]) . ")\n\n";
+		
+		if (!empty($results)) {
+			$output .= implode("\n", $results) . "\n";
+		}
+		
+		if (!empty($errors)) {
+			$output .= "\n**" . $l->t('Errors') . ":**\n" . implode("\n", $errors) . "\n";
+		}
+		
+		// Summary
+		if ($errorCount === 0) {
+			$output .= "\n🎉 " . $l->t('All room configurations reset to global defaults!');
+		} elseif ($successCount > 0) {
+			$output .= "\n⚠️ " . $l->t('Mixed results: %d succeeded, %d failed', [$successCount, $errorCount]);
+		} else {
+			$output .= "\n❌ " . $l->t('All configuration resets failed');
+		}
+		
+	return $output;
+	}
+
+	/**
+	 * Get emoji reaction for command in minimal response mode
+	 * Returns null if normal text response should be used
+	 */
+	private function getEmojiReactionForCommand(array $command, string $token): ?string {
+		// Check if room is in minimal response mode
+		$responseConfig = $this->roomConfigService->getResponseConfig($token);
+		
+		if ($responseConfig['response_mode'] !== 'minimal') {
+			return null; // Use normal text responses
+		}
+		
+		// Get custom emojis for this room
+		$emojis = $this->roomConfigService->getEmojisConfig($token);
+		
+		// Commands that should always use text responses even in minimal mode
+		$alwaysTextCommands = [
+			'status', 'help', 'config_show', 'config_time', 'config_response', 
+			'config_limits', 'config_auto', 'config_emojis', 'config_template',
+			'config_export', 'bulk_config', 'config_reset'
+		];
+		
+		if (in_array($command['command'], $alwaysTextCommands)) {
+			return null; // Always use text for these commands
+		}
+		
+		// Map commands to appropriate emoji reactions
+		switch ($command['command']) {
+			case 'complete':
+			case 'next':
+				return $emojis['completed']; // Use completed emoji
+				
+			case 'reopen':
+				return $emojis['pending']; // Use pending emoji
+				
+			case 'remove':
+			case 'cleanup':
+				return '🧹'; // Cleanup emoji
+				
+			case 'clear':
+			case 'reset':
+				return '🔄'; // Reset emoji
+				
+			case 'reorder':
+			case 'move':
+			case 'swap':
+				return '🔀'; // Shuffle emoji
+				
+			case 'change':
+				return '✏️'; // Edit emoji
+				
+			default:
+				return '👍'; // Generic success emoji
+		}
+	}
+	
+	/**
+	 * Send emoji reaction to user's message
+	 */
+	private function sendEmojiReaction(BotInvokeEvent $event, string $emoji): void {
+		try {
+			// Send bot identifier emoji first (🤖)
+			$event->addReaction('🤖');
+			
+			// Send the action-specific emoji
+			$event->addReaction($emoji);
+			
+		} catch (\Exception $e) {
+			// If reaction fails, silently continue - don't break the bot
+			$this->logger->debug('Failed to send emoji reaction: ' . $e->getMessage());
+		}
+	}
+	
+	/**
+	 * Get emoji reaction for bulk agenda items in minimal response mode
+	 */
+	private function getEmojiReactionForBulkAgenda(string $token, array $result): ?string {
+		$responseConfig = $this->roomConfigService->getResponseConfig($token);
+		if ($responseConfig['response_mode'] !== 'minimal') {
+			return null;
+		}
+		
+		if ($result['success']) {
+			return '📝'; // Memo/list emoji for bulk agenda
+		} else {
+			return '❌'; // Cross mark for errors
+		}
+	}
+	
+	/**
+	 * Get emoji reaction for single agenda item in minimal response mode
+	 */
+	private function getEmojiReactionForSingleAgenda(string $token, array $result): ?string {
+		$responseConfig = $this->roomConfigService->getResponseConfig($token);
+		if ($responseConfig['response_mode'] !== 'minimal') {
+			return null;
+		}
+		
+		if ($result['success']) {
+			return '➕'; // Plus sign for single agenda item
+		} else {
+		return '❌'; // Cross mark for errors
+		}
+	}
+
+	/**
+	 * Handle config export command - export room configuration as bulk commands
+	 */
+	private function handleConfigExport(string $token, ?array $actorData, string $lang): string {
+		$l = $this->l10nFactory->get(Application::APP_ID, $lang);
+		
+		// Check moderator permissions (view configuration requires moderator permissions)
+		if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+			return $this->permissionService->getPermissionDeniedMessage($l->t('export room configuration'), $lang);
+		}
+		
+		return $this->agendaService->exportConfiguration($token, $lang);
 	}
 }

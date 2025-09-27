@@ -1,8 +1,8 @@
 # Room-Level Bot Configuration
 
-**Complete Guide for Agenda Bot v1.4.0**
+**Complete Guide for Agenda Bot v1.6.0**
 
-This document provides comprehensive guidance for the revolutionary Room-Level Bot Configuration system introduced in Agenda Bot v1.4.0, which transforms each Talk room into a perfectly customized meeting assistant.
+This document provides comprehensive guidance for the advanced Room-Level Bot Configuration system, significantly enhanced in v1.6.0 with configuration templates, export/import capabilities, and custom emoji support. Transform each Talk room into a perfectly customized meeting assistant with unprecedented control and flexibility.
 
 ## 🎆 Overview
 
@@ -11,6 +11,9 @@ Room-Level Bot Configuration allows each Nextcloud Talk room to have its own uni
 ### Key Benefits
 
 - **🎯 Perfect Customization**: Each room has exactly the behavior your team needs
+- **📋 Configuration Templates**: Pre-built meeting room templates for instant setup (NEW in v1.6.0)
+- **📤 Export/Import**: Export room configurations as ready-to-copy commands (NEW in v1.6.0)
+- **🎨 Custom Emojis**: Personalize agenda status indicators per room (NEW in v1.6.0)
 - **⚡ Instant Setup**: Configuration changes take effect immediately
 - **🔄 Smart Inheritance**: Room settings override global defaults with intelligent fallback
 - **🔒 Secure Control**: Only moderators and owners can modify room configurations
@@ -289,9 +292,107 @@ config emojis on-time 🟢
 config emojis time-warning 🟡
 ```
 
-## 📋 Complete Configuration Overview
+## 📋 Configuration Templates (NEW in v1.6.0)
 
-Use the `config show` command to see all room configuration at once:
+Configuration templates provide pre-built meeting room setups that can be applied instantly, replacing the need to configure each setting individually.
+
+### Available Templates
+
+| Template | Description | Best For |
+|----------|-------------|----------|
+| **formal** | Formal Business Meeting | Board meetings, client calls, structured discussions |
+| **jour-fixe** | Regular Jour Fixe | Weekly team meetings, recurring check-ins |
+| **workshop** | Collaborative Workshop | Planning sessions, team workshops, extended collaboration |
+| **brainstorm** | Creative Brainstorming | Ideation sessions, creative meetings, open discussions |
+| **training** | Educational Training | Training sessions, learning workshops, skill development |
+
+### Template Commands
+
+```bash
+# View all available templates
+config template list
+
+# View current template configuration
+config template
+
+# Apply a specific template
+config template formal
+config template workshop
+config template brainstorm
+
+# Remove template and return to individual settings
+config template none
+```
+
+### Template Features
+
+- **Atomic application**: All template settings are applied as a single operation
+- **Comprehensive coverage**: Templates configure all 5 configuration areas
+- **Smart overrides**: Template settings take precedence over individual configurations
+- **Easy reset**: Return to individual settings anytime with `config template none`
+
+### Example Template Application
+
+```bash
+# Apply formal business meeting template
+config template formal
+
+# Result: Configures multiple areas automatically:
+# - Time monitoring: 85% warning, 105% overtime
+# - Response mode: Normal (full responses)
+# - Limits: 12 max items, 25min default duration
+# - Auto-behaviors: Start agenda enabled, cleanup disabled
+# - Emojis: Professional emoji set
+```
+
+## 📤 Configuration Export/Import (NEW in v1.6.0)
+
+Export room configurations as ready-to-use commands that can be copied to other rooms.
+
+### Export Command
+
+```bash
+# Export current room configuration
+config export
+```
+
+### Sample Export Output
+
+```
+📋 Configuration Export (5 commands)
+
+💡 Copy these commands to apply this configuration to another room:
+
+```
+config time enable
+config time thresholds 75 110
+config response minimal
+config limits max-items 20
+config limits default-duration 15
+config emojis current-item 🎯
+config emojis completed ✅
+```
+
+💡 Note: You can delete this message if desired.
+```
+
+### Export Features
+
+- **Smart detection**: Only exports room-specific settings, ignores global defaults
+- **Clean output**: Simple command list without section headings for easy copying
+- **Complete coverage**: Exports all configuration areas (time, response, limits, auto-behaviors, emojis)
+- **Copy-paste ready**: Commands can be pasted directly into another room
+- **Bulk application**: All exported commands can be applied as a single message
+
+### Room Replication Workflow
+
+1. **Configure source room** with your preferred settings
+2. **Export configuration**: `config export`
+3. **Copy the commands** from the bot's response
+4. **Switch to target room** and paste all commands at once
+5. **Verify results**: Use `config show` to confirm settings
+
+## 📋 Complete Configuration Overview
 
 ```bash
 config show
@@ -344,11 +445,32 @@ config show
 
 ## 🏢 Meeting Type Templates
 
+### 🊆 **NEW: Built-in Templates (v1.6.0)**
+
+Use the new template system for instant setup:
+
+```bash
+# Apply pre-built templates instantly
+config template jour-fixe      # For daily standups and regular meetings
+config template formal         # For executive and board meetings  
+config template workshop       # For planning and collaborative sessions
+config template brainstorm     # For creative and ideation meetings
+config template training       # For educational and learning sessions
+```
+
+### 🛠️ Custom Configuration Examples
+
+For specialized needs beyond built-in templates:
+
 ### Daily Standup (15 minutes)
 
 **Goal**: Quick status updates with minimal distractions
 
 ```bash
+# Option 1: Use built-in template
+config template jour-fixe
+
+# Option 2: Custom configuration
 # Tight time management
 config time thresholds 70 100
 
@@ -482,20 +604,30 @@ To reset all room configuration and return to global defaults:
 
 ### Configuration Backup & Restore
 
-#### Creating a Configuration Profile
+#### 🊆 **NEW: Configuration Export (v1.6.0)**
+
+The easiest way to backup and replicate configurations:
+
+```bash
+# Export current room configuration
+config export
+
+# Copy the generated commands and save them
+# Paste into any other room to replicate the setup
+```
+
+#### Traditional Configuration Profiles
+
+For specialized workflows, you can still create custom profiles:
 
 1. **Document current settings**:
    ```bash
    config show  # Copy output to document
    ```
 
-2. **Save command sequence**:
+2. **Use export for command generation**:
    ```bash
-   # Save these commands to recreate this configuration:
-   config time thresholds 75 110
-   config response minimal  
-   config limits default-duration 15
-   # ... etc
+   config export  # Get ready-to-use commands
    ```
 
 #### Applying Configuration Profiles
@@ -511,6 +643,8 @@ config limits default-duration 2
 config auto start-agenda enable
 config auto cleanup enable
 ```
+
+**Quick Application**: Copy all commands and paste as a single message in any room.
 
 ## 🔍 Troubleshooting
 
@@ -574,14 +708,20 @@ agenda help
 
 ## 🔮 Future Enhancements
 
+### Recently Implemented (v1.6.0)
+
+- ✅ **Configuration Templates**: Pre-built meeting type configurations
+- ✅ **Configuration Import/Export**: Command-based configuration management
+- ✅ **Custom Emoji Support**: Room-specific emoji customization
+- ✅ **Enhanced Bulk Configuration**: Multi-command processing with grouped responses
+
 ### Planned Features
 
-- **Configuration Templates**: Pre-built meeting type configurations
 - **Bulk Room Configuration**: Admin tools for managing multiple rooms
 - **Advanced Scheduling**: Time-based configuration changes
 - **Calendar Integration**: Sync with Nextcloud Calendar for automatic settings
 - **Analytics Dashboard**: Room-specific usage reports and insights
-- **Configuration Import/Export**: JSON-based configuration management
+- **JSON Export/Import**: Alternative JSON-based configuration management
 
 ### API Extensions
 
