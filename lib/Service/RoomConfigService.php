@@ -822,4 +822,101 @@ class RoomConfigService {
 			'last_summary_timestamp' => $configData['last_summary_timestamp'] ?? null,
 		];
 	}
+	
+	/**
+	 * Get room template configuration
+	 */
+	public function getTemplateConfig(string $token): ?array {
+		$roomConfigEntry = $this->findRoomConfigEntry($token);
+		
+		if (!$roomConfigEntry) {
+			return null;
+		}
+		
+		$configData = json_decode($roomConfigEntry->getDetails() ?: '{}', true);
+		$templateConfig = $configData['template'] ?? null;
+		
+		if ($templateConfig === null) {
+			return null;
+		}
+		
+		return [
+			'template_name' => $templateConfig['template_name'] ?? null,
+			'applied_at' => $templateConfig['applied_at'] ?? null,
+			'configured_by' => $templateConfig['configured_by'] ?? null,
+			'source' => 'room',
+		];
+	}
+	
+	/**
+	 * Set room template configuration
+	 */
+	public function setTemplateConfig(string $token, string $templateName, string $userId = 'system'): void {
+		$roomConfigEntry = $this->findRoomConfigEntry($token);
+		
+		if (!$roomConfigEntry) {
+			// Create new room config entry
+			$roomConfigEntry = new LogEntry();
+			$roomConfigEntry->setServer('local');
+			$roomConfigEntry->setToken($token);
+			$roomConfigEntry->setType(LogEntry::TYPE_ROOM_CONFIG);
+			$existingData = [];
+		} else {
+			// Get existing config data to preserve other settings
+			$existingData = json_decode($roomConfigEntry->getDetails() ?: '{}', true);
+		}
+		
+		// Prepare template configuration data
+		$configData = array_merge($existingData, [
+			'template' => [
+				'template_name' => $templateName,
+				'applied_at' => $this->timeFactory->now()->getTimestamp(),
+				'configured_by' => $userId,
+			],
+			'configured_by' => $userId,
+			'configured_at' => $this->timeFactory->now()->getTimestamp(),
+		]);
+		
+		$roomConfigEntry->setDetails(json_encode($configData, JSON_THROW_ON_ERROR));
+		
+		if ($roomConfigEntry->getId()) {
+			$this->logEntryMapper->update($roomConfigEntry);
+			$this->logger->info('Updated room template config for token: ' . $token, ['template' => $templateName]);
+		} else {
+			$this->logEntryMapper->insert($roomConfigEntry);
+			$this->logger->info('Created room template config for token: ' . $token, ['template' => $templateName]);
+		}
+	}
+	
+	/**
+	 * Reset room template configuration (remove applied template)
+	 */
+	public function resetTemplateConfig(string $token): bool {
+		$roomConfigEntry = $this->findRoomConfigEntry($token);
+		
+		if (!$roomConfigEntry) {
+			return false; // No config to reset
+		}
+		
+		$configData = json_decode($roomConfigEntry->getDetails() ?: '{}', true);
+		
+		// Remove template section if it exists
+		if (!isset($configData['template'])) {
+			return false; // No template config to reset
+		}
+		
+		unset($configData['template']);
+		
+		// If config is now empty (only metadata), delete the entire entry
+		if (empty(array_diff_key($configData, ['configured_by', 'configured_at', 'language', 'language_updated_at', 'last_summary_message_id', 'last_summary_timestamp']))) {
+			$this->logEntryMapper->delete($roomConfigEntry);
+		} else {
+			// Update config without template section
+			$roomConfigEntry->setDetails(json_encode($configData, JSON_THROW_ON_ERROR));
+			$this->logEntryMapper->update($roomConfigEntry);
+		}
+		
+		$this->logger->info('Reset room template config for token: ' . $token);
+		return true;
+	}
 }

@@ -2,15 +2,11 @@
 
 🤖 **A specialized bot for intelligent meeting agenda management and real-time time tracking during Nextcloud Talk calls.**
 
-🌍 **NEW in v1.5.0 German Formality Language Variants with Migration Framework** with informal (Du) and formal (Sie) variants plus robust migration framework for seamless transitions
+🚀 **NEW in v1.6.0 - Advanced Configuration Management!** Configuration templates, room export/import and enhanced bulk configuration system.
 
-🎆 **v1.4.0 introduced Complete Room-Level Bot Configuration!** Transform each Talk room into a perfectly customized meeting assistant with 5 comprehensive configuration areas.
+🌍 **v1.5.0 German Formality Language Variants with Migration Framework** with informal (Du) and formal (Sie) variants plus robust migration framework for seamless transitions
 
-⚡ **v1.3.0 introduced Bulk Agenda Creation** - Import existing agendas from calendar invitations or meeting templates.
-
-⏰ **v1.2.0 introduced Advanced Time Monitoring** - Room-specific time tracking with custom warning thresholds and intelligent automation.
-
-🌍 **v1.1.0 introduced Multi-language Support** - Available in English and German, with complete localization for all features.
+🎆 **v1.4.0 Complete Room-Level Bot Configuration!** Transform each Talk room into a perfectly customized meeting assistant with 5 comprehensive configuration areas.
 
 
 ## Overview
@@ -22,13 +18,11 @@ The Agenda Bot is a comprehensive Nextcloud app that transforms how teams manage
 
 ## Key Features
 
-### ⚙️ **Room-Level Bot Configuration (v1.4.0)**
-- **Complete Customization** - Five comprehensive configuration areas for personalized room experiences
-- **Time Monitoring Config** - Custom warning thresholds, overtime alerts, and monitoring controls per room
-- **Response Behavior** - Choose between full text responses or minimal emoji-only mode to reduce notifications
-- **Agenda Limits** - Configure max items (5-100), bulk operations (3-50), and default durations (1-120 min)
-- **Auto-behaviors** - Control automatic start, cleanup, and summary generation behaviors
-- **Custom Emojis** - Personalize agenda item status indicators with room-specific emoji sets
+### ⚙️ **Advanced Configuration Management (v1.6.0)**
+- **Configuration Templates** - Pre-built meeting room templates (Formal Business, Workshop, Brainstorming, etc.)
+- **Room Export/Import** - Export room configurations as ready-to-copy bulk commands for easy replication
+- **Bulk Configuration System** - Apply multiple configuration commands in a single message with grouped responses
+- **Template Management** - Browse available templates, apply instantly, or reset to individual settings
 - **Unified Interface** - Simple `config show` command displays complete room configuration overview
 - **Smart Inheritance** - Room settings override global defaults with intelligent fallback
 
@@ -193,10 +187,19 @@ agenda:
 | `move: X to Y` | Move item X to position Y | Moderators, Owners | `move: 3 to 1` |
 | `swap: X,Y` | Swap positions of items X and Y | Moderators, Owners | `swap: 1,3` |
 
-#### Room-Level Bot Configuration (NEW in v1.4.0)
+#### Advanced Configuration Management (v1.6.0)
 | Command | Description | Permissions | Example |
 |---------|-------------|-------------|----------|
 | `config show` | **Display complete room configuration overview** | All participants | `config show` |
+| `config export` | **Export room configuration as bulk commands** | Moderators, Owners | `config export` |
+| `config template` | Show current template configuration | All participants | `config template` |
+| `config template list` | **Browse all available templates** | All participants | `config template list` |
+| `config template <name>` | **Apply configuration template** | Moderators, Owners | `config template formal` |
+| `config template none` | Reset template to individual settings | Moderators, Owners | `config template none` |
+
+#### Configuration Areas
+| Command | Description | Permissions | Example |
+|---------|-------------|-------------|----------|
 | `config time` | Show/configure time monitoring settings | Moderators, Owners | `config time` |
 | `config time enable/disable` | Toggle time monitoring for this room | Moderators, Owners | `config time enable` |
 | `config time warning X` | Set warning threshold (10-95%) | Moderators, Owners | `config time warning 75` |
@@ -208,7 +211,12 @@ agenda:
 | `config limits default-duration X` | Set default item duration (1-120 min) | Moderators, Owners | `config limits default-duration 15` |
 | `config auto start-agenda enable` | **Auto-start agenda on call begin** | Moderators, Owners | `config auto start-agenda enable` |
 | `config auto cleanup enable` | Auto-remove completed items after meeting | Moderators, Owners | `config auto cleanup enable` |
-| `config emojis current-item 🎯` | **Customize agenda item status emojis** | Moderators, Owners | `config emojis completed 🎉` |
+| `config emojis current-item 🎯` | **Set current agenda item emoji** | Moderators, Owners | `config emojis current-item 🎯` |
+| `config emojis completed ✅` | **Set completed item emoji** | Moderators, Owners | `config emojis completed 🎉` |
+| `config emojis pending 📝` | **Set pending item emoji** | Moderators, Owners | `config emojis pending 📝` |
+| `config emojis on-time 👍` | **Set on-time status emoji** | Moderators, Owners | `config emojis on-time 💚` |
+| `config emojis time-warning ⏰` | **Set time warning emoji** | Moderators, Owners | `config emojis time-warning 🚨` |
+| `config emojis reset` | Reset emojis to global defaults | Moderators, Owners | `config emojis reset` |
 
 ### Example Workflow
 

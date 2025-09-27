@@ -54,14 +54,60 @@ class CommandParser {
 	public const CONFIG_EMOJIS_PATTERN = '/^config\s+emojis$/i';
 	public const CONFIG_EMOJIS_SET_PATTERN = '/^config\s+emojis\s+(current-item|completed|pending|on-time|time-warning)\s+(.+)$/i';
 	public const CONFIG_EMOJIS_RESET_PATTERN = '/^config\s+emojis\s+reset$/i';
+	
+	// Config template patterns
+	public const CONFIG_TEMPLATE_PATTERN = '/^config\s+template$/i';
+	public const CONFIG_TEMPLATE_LIST_PATTERN = '/^config\s+template\s+list$/i';
+	public const CONFIG_TEMPLATE_APPLY_PATTERN = '/^config\s+template\s+(formal|jour-fixe|workshop|brainstorm|training|none)$/i';
+	
+	// Config export pattern
+	public const CONFIG_EXPORT_PATTERN = '/^config\s+export$/i';
+	
+	// Note: Bulk configuration detection now uses isBulkConfigMessage() method
+	// instead of regex pattern to properly handle empty lines between commands
+	
 	public const CLEANUP_PATTERN = '/^(agenda\s+)?(cleanup|clean)$/i';
 	public const RESET_PATTERN = '/^agenda\s+reset$/i';
+
+	/**
+	 * Check if message contains multiple config commands
+	 */
+	private function isBulkConfigMessage(string $message): bool {
+		$lines = explode("\n", trim($message));
+		$configCount = 0;
+		
+		foreach ($lines as $line) {
+			$line = trim($line);
+			// Skip empty lines
+			if (empty($line)) {
+				continue;
+			}
+			// Check if line starts with "config "
+			if (preg_match('/^config\s+/', $line)) {
+				$configCount++;
+				if ($configCount >= 2) {
+					return true;
+				}
+			}
+		}
+		
+		return false;
+	}
 
 	/**
 	 * Parse command from message
 	 */
 	public function parseCommand(string $message, string $token): ?array {
 		$message = trim($message);
+		
+		// Check for bulk config commands first (multiple config commands in one message)
+		if ($this->isBulkConfigMessage($message)) {
+			return [
+				'command' => 'bulk_config',
+				'token' => $token,
+				'message' => $message
+			];
+		}
 
 		// Status commands
 		if (preg_match(self::STATUS_COMMAND_PATTERN, $message, $matches)) {
@@ -375,6 +421,40 @@ class CommandParser {
 				'action' => 'reset'
 			];
 		}
+		
+		// Config template commands
+		if (preg_match(self::CONFIG_TEMPLATE_LIST_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'config_template',
+				'token' => $token,
+				'action' => 'list'
+			];
+		}
+		
+		if (preg_match(self::CONFIG_TEMPLATE_APPLY_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'config_template',
+				'token' => $token,
+				'action' => 'apply',
+				'param1' => strtolower($matches[1]) // template name
+			];
+		}
+		
+		if (preg_match(self::CONFIG_TEMPLATE_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'config_template',
+				'token' => $token,
+				'action' => 'show'
+			];
+		}
+		
+		// Config export command
+		if (preg_match(self::CONFIG_EXPORT_PATTERN, $message, $matches)) {
+			return [
+				'command' => 'config_export',
+				'token' => $token
+			];
+		}
 
 
 		// Cleanup command
@@ -394,7 +474,352 @@ class CommandParser {
 			];
 		}
 
-		return null;
+	return null;
+	}
+
+	/**
+	 * Parse bulk configuration commands from a multi-line message
+	 */
+	public function parseBulkCommands(string $message, string $token): array {
+		$commands = [];
+		$lines = explode("\n", trim($message));
+		
+		foreach ($lines as $lineNum => $line) {
+			$line = trim($line);
+			
+			// Skip empty lines
+			if (empty($line)) {
+				continue;
+			}
+			
+			// Parse individual config command
+			$parsedCommand = $this->parseCommand($line, $token);
+			
+			if ($parsedCommand !== null) {
+				// Add line number for error reporting
+				$parsedCommand['line_number'] = $lineNum + 1;
+				$parsedCommand['original_line'] = $line;
+				$commands[] = $parsedCommand;
+			} else {
+				// Enhanced error detection with specific suggestions
+				$errorDetails = $this->analyzeCommandError($line);
+				$commands[] = [
+					'command' => 'invalid',
+					'token' => $token,
+					'line_number' => $lineNum + 1,
+					'original_line' => $line,
+					'error' => $errorDetails['message'],
+					'suggestion' => $errorDetails['suggestion'] ?? null
+				];
+			}
+		}
+		
+	return $commands;
+	}
+	
+	/**
+	 * Analyze command error and provide specific suggestions
+	 */
+	private function analyzeCommandError(string $line): array {
+		$line = trim($line);
+		
+		// Check for common command prefixes
+		if (preg_match('/^config\s/', $line)) {
+			return $this->analyzeConfigCommandError($line);
+		}
+		
+		// Check for time monitoring legacy commands
+		if (preg_match('/^time\s/', $line)) {
+			return [
+				'message' => 'Legacy time command format',
+				'suggestion' => 'Use new format: `config time [action]` (e.g., `config time enable`, `config time warning 75`)'
+			];
+		}
+		
+		// Check for agenda commands that shouldn\'t be in bulk config
+		if (preg_match('/^(agenda|topic|item|add)\s*:/', $line)) {
+			return [
+				'message' => 'Agenda items cannot be mixed with configuration commands',
+				'suggestion' => 'Use separate messages for agenda items and config commands'
+			];
+		}
+		
+		// Check for unclear commands
+		if (strlen($line) < 3) {
+			return [
+				'message' => 'Command too short',
+				'suggestion' => 'Use `config show` to see available commands'
+			];
+		}
+		
+		// Generic error
+		return [
+			'message' => 'Unrecognized command syntax',
+			'suggestion' => 'Use `agenda help` to see all available commands'
+		];
+	}
+	
+	/**
+	 * Analyze config command specific errors
+	 */
+	private function analyzeConfigCommandError(string $line): array {
+		// Extract the config subcommand
+		if (preg_match('/^config\s+(\w+)(?:\s+(.*))?$/i', $line, $matches)) {
+			$subcommand = strtolower($matches[1]);
+			$params = $matches[2] ?? '';
+			
+			switch ($subcommand) {
+				case 'time':
+					return $this->analyzeTimeCommandError($params);
+					
+				case 'response':
+					return $this->analyzeResponseCommandError($params);
+					
+				case 'limits':
+					return $this->analyzeLimitsCommandError($params);
+					
+				case 'auto':
+					return $this->analyzeAutoCommandError($params);
+					
+				case 'emojis':
+					return $this->analyzeEmojisCommandError($params);
+					
+				case 'template':
+					return $this->analyzeTemplateCommandError($params);
+					
+				case 'export':
+					if (!empty($params)) {
+						return [
+							'message' => 'Export command does not take parameters',
+							'suggestion' => 'Use: `config export`'
+						];
+					}
+					return [
+						'message' => 'Export command syntax error',
+						'suggestion' => 'Use: `config export`'
+					];
+					
+				default:
+					return [
+						'message' => 'Unknown config area: ' . $subcommand,
+						'suggestion' => 'Available areas: time, response, limits, auto, emojis, template, export'
+					];
+			}
+		}
+		
+		return [
+			'message' => 'Invalid config command format',
+			'suggestion' => 'Use format: `config [area] [action]` (e.g., `config time enable`)'
+		];
+	}
+	
+	/**
+	 * Analyze time command errors
+	 */
+	private function analyzeTimeCommandError(string $params): array {
+		if (empty($params)) {
+			return [
+				'message' => 'Time command missing action',
+				'suggestion' => 'Use: enable, disable, warning [10-95], overtime [105-300], thresholds [warn] [overtime], or reset'
+			];
+		}
+		
+		// Check for common mistakes
+		if (preg_match('/^(warning|overtime)\s+(\d+)/', $params, $matches)) {
+			$action = $matches[1];
+			$value = (int)$matches[2];
+			
+			if ($action === 'warning' && ($value < 10 || $value > 95)) {
+				return [
+					'message' => 'Warning threshold out of range: ' . $value,
+					'suggestion' => 'Warning threshold must be between 10-95 (e.g., `config time warning 75`)'
+				];
+			}
+			
+			if ($action === 'overtime' && ($value < 105 || $value > 300)) {
+				return [
+					'message' => 'Overtime threshold out of range: ' . $value,
+					'suggestion' => 'Overtime threshold must be between 105-300 (e.g., `config time overtime 120`)'
+				];
+			}
+		}
+		
+		if (preg_match('/^thresholds\s+(\d+)\s+(\d+)/', $params, $matches)) {
+			$warning = (int)$matches[1];
+			$overtime = (int)$matches[2];
+			
+			if ($warning >= $overtime) {
+				return [
+					'message' => 'Warning threshold must be less than overtime threshold',
+					'suggestion' => 'Example: `config time thresholds 75 110` (warning < overtime)'
+				];
+			}
+		}
+		
+		return [
+			'message' => 'Invalid time command parameters',
+			'suggestion' => 'Examples: `config time enable`, `config time warning 80`, `config time thresholds 75 110`'
+		];
+	}
+	
+	/**
+	 * Analyze response command errors
+	 */
+	private function analyzeResponseCommandError(string $params): array {
+		if (empty($params)) {
+			return [
+				'message' => 'Response command missing mode',
+				'suggestion' => 'Use: normal, minimal, or reset'
+			];
+		}
+		
+		$mode = strtolower(trim($params));
+		if (!in_array($mode, ['normal', 'minimal', 'reset'])) {
+			return [
+				'message' => 'Invalid response mode: ' . $params,
+				'suggestion' => 'Available modes: normal, minimal, or reset'
+			];
+		}
+		
+		return [
+			'message' => 'Response command syntax error',
+			'suggestion' => 'Use: `config response normal` or `config response minimal`'
+		];
+	}
+	
+	/**
+	 * Analyze limits command errors
+	 */
+	private function analyzeLimitsCommandError(string $params): array {
+		if (empty($params)) {
+			return [
+				'message' => 'Limits command missing parameters',
+				'suggestion' => 'Use: max-items [5-100], max-bulk [3-50], default-duration [1-120], or reset'
+			];
+		}
+		
+		// Check for value range errors
+		if (preg_match('/^max-items\s+(\d+)/', $params, $matches)) {
+			$value = (int)$matches[1];
+			if ($value < 5 || $value > 100) {
+				return [
+					'message' => 'Max items out of range: ' . $value,
+					'suggestion' => 'Max items must be between 5-100 (e.g., `config limits max-items 50`)'
+				];
+			}
+		}
+		
+		if (preg_match('/^max-bulk\s+(\d+)/', $params, $matches)) {
+			$value = (int)$matches[1];
+			if ($value < 3 || $value > 50) {
+				return [
+					'message' => 'Max bulk out of range: ' . $value,
+					'suggestion' => 'Max bulk must be between 3-50 (e.g., `config limits max-bulk 25`)'
+				];
+			}
+		}
+		
+		if (preg_match('/^default-duration\s+(\d+)/', $params, $matches)) {
+			$value = (int)$matches[1];
+			if ($value < 1 || $value > 120) {
+				return [
+					'message' => 'Default duration out of range: ' . $value,
+					'suggestion' => 'Default duration must be between 1-120 minutes (e.g., `config limits default-duration 10`)'
+				];
+			}
+		}
+		
+		return [
+			'message' => 'Invalid limits command parameters',
+			'suggestion' => 'Examples: `config limits max-items 30`, `config limits default-duration 15`'
+		];
+	}
+	
+	/**
+	 * Analyze auto command errors
+	 */
+	private function analyzeAutoCommandError(string $params): array {
+		if (empty($params)) {
+			return [
+				'message' => 'Auto command missing parameters',
+				'suggestion' => 'Use: start-agenda [enable/disable], cleanup [enable/disable], summary [enable/disable], or reset'
+			];
+		}
+		
+		// Check for valid auto behaviors
+		if (preg_match('/^(start-agenda|cleanup|summary)\s+(\w+)/', $params, $matches)) {
+			$behavior = $matches[1];
+			$action = strtolower($matches[2]);
+			
+			if (!in_array($action, ['enable', 'disable'])) {
+				return [
+					'message' => 'Invalid action for ' . $behavior . ': ' . $action,
+					'suggestion' => 'Use enable or disable (e.g., `config auto ' . $behavior . ' enable`)'
+				];
+			}
+		}
+		
+		return [
+			'message' => 'Invalid auto command parameters',
+			'suggestion' => 'Examples: `config auto start-agenda enable`, `config auto cleanup disable`'
+		];
+	}
+	
+	/**
+	 * Analyze emojis command errors
+	 */
+	private function analyzeEmojisCommandError(string $params): array {
+		if (empty($params)) {
+			return [
+				'message' => 'Emojis command missing parameters',
+				'suggestion' => 'Use: current-item, completed, pending, on-time, time-warning [emoji], or reset'
+			];
+		}
+		
+		// Check for valid emoji types
+		if (preg_match('/^(current-item|completed|pending|on-time|time-warning)\s+(.*)/', $params, $matches)) {
+			$emojiType = $matches[1];
+			$emoji = trim($matches[2]);
+			
+			if (empty($emoji)) {
+				return [
+					'message' => 'Missing emoji for ' . $emojiType,
+					'suggestion' => 'Example: `config emojis ' . $emojiType . ' 🎯`'
+				];
+			}
+		}
+		
+		return [
+			'message' => 'Invalid emojis command parameters',
+			'suggestion' => 'Examples: `config emojis current-item 🎯`, `config emojis completed 🎉`'
+		];
+	}
+	
+	/**
+	 * Analyze template command errors
+	 */
+	private function analyzeTemplateCommandError(string $params): array {
+		if (empty($params)) {
+			return [
+				'message' => 'Template command missing parameters',
+				'suggestion' => 'Use: list, [template-name], or reset'
+			];
+		}
+		
+		$templateName = strtolower(trim($params));
+		$validTemplates = ['formal', 'jour-fixe', 'workshop', 'brainstorm', 'training', 'list', 'none', 'reset'];
+		
+		if (!in_array($templateName, $validTemplates)) {
+			return [
+				'message' => 'Unknown template: ' . $params,
+				'suggestion' => 'Use `config template list` to see available templates'
+			];
+		}
+		
+		return [
+			'message' => 'Invalid template command',
+			'suggestion' => 'Examples: `config template formal`, `config template list`'
+		];
 	}
 
 	/**
