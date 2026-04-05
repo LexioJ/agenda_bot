@@ -2,6 +2,17 @@
 
 All notable changes to the Agenda Bot project will be documented in this file.
 
+## [1.6.1] - 2026-04-05
+
+### 🛠️ Fixed - Mention handling in agenda items (GitHub Issue #25)
+- Preserved rich-message mentions when parsing incoming Talk chat messages
+- Replaced `{mention-*}` placeholders with valid mention syntax before command and agenda parsing
+- Agenda items now keep mention text so follow-up bot messages can reference participants correctly
+
+### 🔧 Changed - Compatibility
+- Added Nextcloud 33 support in `appinfo/info.xml`
+- Updated documented compatibility range to Nextcloud 31-33
+
 ## [1.6.0] - 2025-09-27
 
 ### 🚀 Major Release - Advanced Configuration Management (GitHub Issue #18)

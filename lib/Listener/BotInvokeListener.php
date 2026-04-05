@@ -97,8 +97,16 @@ class BotInvokeListener implements IEventListener {
 		}
 		
 		if ($data['type'] === 'Create' && $data['object']['name'] === 'message') {
-			$messageData = json_decode($data['object']['content'], true);
-			$message = $messageData['message'];
+			$messageData = json_decode($data['object']['content'] ?? '', true);
+			if (!is_array($messageData) || !isset($messageData['message']) || !is_string($messageData['message'])) {
+				$this->logger->debug('Skipping message event with invalid content payload', [
+					'content' => $data['object']['content'] ?? null,
+					'type' => $data['type'] ?? null,
+					'name' => $data['object']['name'] ?? null,
+				]);
+				return;
+			}
+			$message = $this->replaceMentionPlaceholdersWithMentions($messageData);
 			$token = $data['target']['id'];
 
 			// Check for commands first
@@ -551,6 +559,87 @@ class BotInvokeListener implements IEventListener {
 	default:
 		return null;
 		}
+	}
+
+	/**
+	 * Replace rich mention placeholders (e.g. {mention-user1})
+	 * with mention syntax understood by Talk.
+	 *
+	 * @param array{message: string, parameters?: array<string, array<string, mixed>>} $messageData
+	 */
+	private function replaceMentionPlaceholdersWithMentions(array $messageData): string {
+		$message = $messageData['message'];
+		$parameters = $messageData['parameters'] ?? null;
+
+		if (!is_array($parameters) || $parameters === []) {
+			return $message;
+		}
+
+		foreach ($parameters as $parameterId => $parameterData) {
+			if (!is_string($parameterId) || !is_array($parameterData) || !str_starts_with($parameterId, 'mention-')) {
+				continue;
+			}
+
+			$placeholder = '{' . $parameterId . '}';
+			if (!str_contains($message, $placeholder)) {
+				continue;
+			}
+
+			$mentionText = $this->buildMentionTextFromParameter($parameterId, $parameterData);
+			if ($mentionText === null) {
+				continue;
+			}
+
+			$message = str_replace($placeholder, $mentionText, $message);
+		}
+
+		return $message;
+	}
+
+	/**
+	 * @param array<string, mixed> $parameterData
+	 */
+	private function buildMentionTextFromParameter(string $parameterId, array $parameterData): ?string {
+		$mentionId = $parameterData['mention-id'] ?? null;
+		if (is_string($mentionId) && trim($mentionId) !== '') {
+			return $this->formatMentionIdForMessage($mentionId);
+		}
+
+		$id = $parameterData['id'] ?? null;
+		if (is_string($id) && trim($id) !== '') {
+			return $this->formatMentionIdForMessage($id);
+		}
+
+		$name = $parameterData['name'] ?? null;
+		if (is_string($name) && trim($name) !== '') {
+			return '@' . trim($name);
+		}
+
+		$fallback = str_replace('mention-', '', $parameterId);
+		if ($fallback === '') {
+			return null;
+		}
+
+		return '@' . $fallback;
+	}
+
+	private function formatMentionIdForMessage(string $mentionId): string {
+		$cleanMentionId = trim(ltrim($mentionId, '@'));
+		$cleanMentionId = str_replace('"', '', $cleanMentionId);
+
+		if ($cleanMentionId === '') {
+			return '@';
+		}
+
+		$needsQuotedSyntax = str_contains($cleanMentionId, ' ')
+			|| str_contains($cleanMentionId, '/')
+			|| str_contains($cleanMentionId, '@');
+
+		if ($needsQuotedSyntax) {
+			return '@"' . $cleanMentionId . '"';
+		}
+
+		return '@' . $cleanMentionId;
 	}
 	
 	/**
