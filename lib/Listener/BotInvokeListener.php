@@ -23,7 +23,6 @@ use OCA\Talk\Events\BotInvokeEvent;
 use OCA\Talk\Manager;
 use OCA\Talk\Model\Attendee;
 use OCP\AppFramework\Utility\ITimeFactory;
-use OCP\DB\Exception as DBException;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use OCP\IConfig;
@@ -249,6 +248,16 @@ class BotInvokeListener implements IEventListener {
 						$event->addAnswer($cleanupResult, true);
 					}
 				}
+			} else {
+				// Unrecognized webhook payload. Talk's bot invoke contract is a
+				// non-OCP, Talk-internal interface with no cross-major-version
+				// guarantee, so log unhandled type/object.name combinations to
+				// make a post-upgrade break (e.g. renamed fields on Talk 21+)
+				// observable instead of silently swallowed.
+				$this->logger->debug('Received unhandled bot invoke payload', [
+					'type' => $data['type'] ?? null,
+					'objectName' => $data['object']['name'] ?? null,
+				]);
 			}
 		}
 	}
@@ -414,11 +423,20 @@ class BotInvokeListener implements IEventListener {
 		
 		// Get stored room language for localized messages
 		$roomLanguage = $this->roomConfigService->getRoomLanguage($token) ?? 'en';
-		
-		// For reaction-triggered cleanup, bypass permission check since:
-		// 1. Only users with conversation access can react to messages
-		// 2. Reactions are typically made by moderators/owners managing the meeting
-		// 3. The reaction itself serves as user consent for cleanup
+
+		// Reaction-triggered cleanup is a destructive operation, so it must be
+		// gated by the same moderator/owner permission model as every other
+		// mutating command. Reacting to a message only requires conversation
+		// access, which is not sufficient authorization on its own. If the
+		// actor is not a moderator, silently ignore the reaction.
+		if (!empty($actorData) && !$this->permissionService->isActorModerator($token, $actorData)) {
+			$this->logger->debug('Ignoring reaction-triggered cleanup from non-moderator actor', [
+				'token' => $token,
+				'actorId' => $actorData['id'] ?? null,
+			]);
+			return;
+		}
+
 		$cleanupResult = $this->agendaService->removeCompletedItems($token, null, $roomLanguage);
 		if ($cleanupResult) {
 			// Clear the stored summary message ID since cleanup was successful

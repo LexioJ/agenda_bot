@@ -10,14 +10,17 @@ declare(strict_types=1);
 namespace OCA\AgendaBot\Service;
 
 use OCA\AgendaBot\AppInfo\Application;
+use OCA\Talk\Exceptions\ParticipantNotFoundException;
 use OCA\Talk\Manager;
 use OCA\Talk\Participant;
+use OCA\Talk\Service\ParticipantService;
 use OCP\L10N\IFactory;
 use Psr\Log\LoggerInterface;
 
 class PermissionService {
 	public function __construct(
 		private Manager $talkManager,
+		private ParticipantService $participantService,
 		private LoggerInterface $logger,
 		private IFactory $l10nFactory,
 	) {
@@ -35,16 +38,19 @@ class PermissionService {
 				return false;
 			}
 
-			// Get participant for this user
-			$participant = $room->getParticipant($userId, false);
-			if (!$participant) {
+			// Get participant for this user.
+			// Note: Talk removed Room::getParticipant() (present up to Talk 20 /
+			// NC33); from Talk 21 / NC34 the lookup lives on ParticipantService.
+			try {
+				$participant = $this->participantService->getParticipant($room, $userId);
+			} catch (ParticipantNotFoundException $e) {
 				$this->logger->debug('Could not find participant for user: ' . $userId . ' in room: ' . $token);
 				return false;
 			}
 
 			// Check if participant has moderator permissions
 			$participantType = $participant->getAttendee()->getParticipantType();
-			
+
 			return in_array($participantType, [
 				Participant::OWNER,
 				Participant::MODERATOR,
@@ -83,20 +89,23 @@ class PermissionService {
 			$this->logger->debug(sprintf('Actor %s talkParticipantType %d -> checking moderator permissions', $actorId, $participantType));
 			
 			// Check if participant type indicates moderator or owner
-			// Type 1 = Owner, Type 2 = Moderator, Type 6 = Guest with moderator permissions
 			$isModerator = in_array($participantType, [
-				1, // Participant::OWNER - Owner
-				2, // Participant::MODERATOR - Moderator  
-				6, // Participant::GUEST_MODERATOR - Guest with moderator permissions
+				Participant::OWNER,
+				Participant::MODERATOR,
+				Participant::GUEST_MODERATOR,
 			], true);
 			
 			$this->logger->debug(sprintf('Actor %s talkParticipantType %d -> isModerator: %s', $actorId, $participantType, $isModerator ? 'true' : 'false'));
 			return $isModerator;
 		}
 
-		// Fallback to Talk API if talkParticipantType not available
+		// Fallback to Talk API if talkParticipantType not available.
+		// Reaction ('Like') events do not carry talkParticipantType, so this
+		// path is used for reaction-triggered actions. The actor id here is
+		// prefixed (e.g. 'users/<uid>'), but Talk's getParticipant() expects
+		// the bare user id, so strip the prefix before looking it up.
 		try {
-			$result = $this->isUserModerator($token, $actorId);
+			$result = $this->isUserModerator($token, $this->cleanActorId($actorId));
 			return $result;
 		} catch (\Exception $e) {
 			$this->logger->error('Failed to check actor permissions: ' . $e->getMessage(), [
@@ -107,6 +116,19 @@ class PermissionService {
 			]);
 			return false;
 		}
+	}
+
+	/**
+	 * Strip the actor-type prefix (e.g. 'users/', 'guests/') from an actor id
+	 * so it can be passed to Talk's getParticipant(), which expects the bare id.
+	 */
+	private function cleanActorId(string $actorId): string {
+		foreach (['users/', 'guests/', 'emails/', 'federated_users/'] as $prefix) {
+			if (str_starts_with($actorId, $prefix)) {
+				return substr($actorId, strlen($prefix));
+			}
+		}
+		return $actorId;
 	}
 
 	/**
@@ -140,10 +162,10 @@ class PermissionService {
 		$participantType = (int)$participantType;
 
 		$canAdd = in_array($participantType, [
-			1, // Participant::OWNER - Owner
-			2, // Participant::MODERATOR - Moderator
-			3, // Participant::USER - User
-			6, // Participant::GUEST_MODERATOR - Guest with moderator permissions
+			Participant::OWNER,
+			Participant::MODERATOR,
+			Participant::USER,
+			Participant::GUEST_MODERATOR,
 		], true);
 		
 		return $canAdd;
@@ -176,12 +198,12 @@ class PermissionService {
 
 		// All valid participant types can view agenda
 		return in_array($participantType, [
-			1, // Participant::OWNER - Owner
-			2, // Participant::MODERATOR - Moderator
-			3, // Participant::USER - User
-			4, // Participant::GUEST - Guest
-			5, // Participant::USER_FOLLOWING_LINK - User following a public link
-			6, // Participant::GUEST_MODERATOR - Guest with moderator permissions
+			Participant::OWNER,
+			Participant::MODERATOR,
+			Participant::USER,
+			Participant::GUEST,
+			Participant::USER_FOLLOWING_LINK,
+			Participant::GUEST_MODERATOR,
 		], true);
 	}
 

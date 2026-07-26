@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\AgendaBot\Migration\Tasks;
 
+use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 use Psr\Log\LoggerInterface;
 
@@ -117,7 +118,7 @@ class GermanFormalityMigrationTask implements IMigrationTask {
         $qb = $this->db->getQueryBuilder();
         $result = $qb->select('token')
             ->from('talk_bots_conversation')
-            ->where($qb->expr()->eq('bot_id', $qb->createNamedParameter($oldFormalBotId, \PDO::PARAM_INT)))
+            ->where($qb->expr()->eq('bot_id', $qb->createNamedParameter($oldFormalBotId, IQueryBuilder::PARAM_INT)))
             ->andWhere($qb->expr()->eq('state', $qb->createNamedParameter(1))) // ENABLED
             ->executeQuery();
             
@@ -135,9 +136,9 @@ class GermanFormalityMigrationTask implements IMigrationTask {
                 // Update the bot_id assignment to the new formal German bot
                 $updateQb = $this->db->getQueryBuilder();
                 $updateQb->update('talk_bots_conversation')
-                    ->set('bot_id', $updateQb->createNamedParameter($newFormalBotId, \PDO::PARAM_INT))
+                    ->set('bot_id', $updateQb->createNamedParameter($newFormalBotId, IQueryBuilder::PARAM_INT))
                     ->where($updateQb->expr()->eq('token', $updateQb->createNamedParameter($assignment['token'])))
-                    ->andWhere($updateQb->expr()->eq('bot_id', $updateQb->createNamedParameter($oldFormalBotId, \PDO::PARAM_INT)));
+                    ->andWhere($updateQb->expr()->eq('bot_id', $updateQb->createNamedParameter($oldFormalBotId, IQueryBuilder::PARAM_INT)));
                     
                 $updatedRows = $updateQb->executeStatement();
                 
@@ -219,7 +220,7 @@ class GermanFormalityMigrationTask implements IMigrationTask {
                     $updateQb = $this->db->getQueryBuilder();
                     $updateQb->update('ab_log_entries')
                         ->set('details', $updateQb->createNamedParameter($updatedDetails))
-                        ->where($updateQb->expr()->eq('id', $updateQb->createNamedParameter($config['id'], \PDO::PARAM_INT)));
+                        ->where($updateQb->expr()->eq('id', $updateQb->createNamedParameter($config['id'], IQueryBuilder::PARAM_INT)));
                     
                     $updateQb->executeStatement();
                     $updatedCount++;

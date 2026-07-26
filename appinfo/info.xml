@@ -76,7 +76,7 @@ Tired of unproductive meetings that run overtime? The Agenda Bot transforms chao
 
 #### Start having better meetings - Add the Agenda Bot to your Talk rooms and experience the difference!]]></description>
 
-	<version>1.6.1</version>
+	<version>1.7.0</version>
 	<licence>agpl</licence>
 
 	<author>Agenda Bot Team</author>
@@ -99,7 +99,11 @@ Tired of unproductive meetings that run overtime? The Agenda Bot transforms chao
 	<screenshot>https://raw.githubusercontent.com/lexioj/agenda_bot/main/docs/agenda_bot_help_command.png</screenshot>
 
 	<dependencies>
-		<nextcloud min-version="31" max-version="33" />
+		<!-- This app is entirely driven by Talk's bot API, so Talk (spreed)
+		     must be present. Compatible Talk version is enforced by the
+		     supported Nextcloud range below. -->
+		<app>spreed</app>
+		<nextcloud min-version="31" max-version="34" />
 	</dependencies>
 
 	<background-jobs>

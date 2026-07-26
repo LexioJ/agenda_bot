@@ -2,6 +2,26 @@
 
 All notable changes to the Agenda Bot project will be documented in this file.
 
+## [1.7.0] - 2026-07-26
+
+### 🔒 Security - Reaction-triggered cleanup permission gap
+- Reaction-based agenda cleanup now enforces the same moderator/owner permission model as every other mutating command
+- Previously, any conversation participant (including guests) could trigger removal of completed agenda items by reacting to a summary message
+- Non-moderator cleanup reactions are now logged and safely ignored, closing an authorization gap and a spoofable content-heuristic path
+
+### 🔧 Changed - Compatibility
+- Added Nextcloud 34 support in `appinfo/info.xml`
+- Updated documented compatibility range to Nextcloud 31-34
+- Declared explicit Talk (`spreed`) app dependency, since Agenda Bot is entirely driven by the Talk bot API
+
+### 🛠️ Fixed - API robustness & hardening
+- **Nextcloud 34 breaking change**: migrated moderator lookup from the removed `Room::getParticipant()` method (gone in Talk 21 / NC34) to `ParticipantService::getParticipant()`, fixing an HTTP 500 on reaction-triggered cleanup
+- Replaced hardcoded Talk participant-type integers with symbolic `Participant::*` constants in permission checks, so future Talk changes fail loudly instead of silently misbehaving
+- Reaction moderator checks now strip actor-id prefixes (`users/`, `guests/`, …) before Talk participant lookups, which reaction events require since they omit `talkParticipantType`
+- Switched migration queries from `\PDO::PARAM_INT` to the sanctioned `IQueryBuilder::PARAM_INT` for forward compatibility with Nextcloud database layer changes
+- Added a debug fallback log for unrecognized bot invoke payloads, making post-upgrade Talk API changes observable instead of silently ignored
+- Removed an unused import in `BotInvokeListener`
+
 ## [1.6.1] - 2026-04-05
 
 ### 🛠️ Fixed - Mention handling in agenda items (GitHub Issue #25)
