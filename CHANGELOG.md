@@ -2,6 +2,13 @@
 
 All notable changes to the Agenda Bot project will be documented in this file.
 
+## [1.7.1] - 2026-09-26
+
+### 🔧 Changed - Compatibility
+- Added Nextcloud 35 support in `appinfo/info.xml`
+- Updated documented compatibility range to Nextcloud 31-35
+- Verified app functionality on Nextcloud 35
+
 ## [1.7.0] - 2026-07-26
 
 ### 🔒 Security - Reaction-triggered cleanup permission gap
